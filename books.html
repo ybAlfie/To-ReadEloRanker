@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Read ELO Ranker - My Books</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Applies the saved theme before first paint, so there is no flash -->
+    <script src="js/theme.js"></script>
+    <script src="js/elo.js"></script>
+    <script src="js/app.js" defer></script>
+    <style>
+        .panel {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+
+        .panel h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+        }
+
+        .stack-form label {
+            display: block;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-size: 0.95em;
+        }
+
+        .stack-form input,
+        .stack-form textarea,
+        #bulk-input {
+            display: block;
+            width: 100%;
+            margin-top: 4px;
+            padding: 6px 8px;
+            font-family: inherit;
+            font-size: 1em;
+            color: var(--text);
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .inline-hint {
+            color: var(--muted-soft);
+            font-size: 0.85em;
+            font-style: italic;
+        }
+
+        .button-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .button-row button {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: inherit;
+        }
+
+        .button-row button.primary {
+            background-color: var(--accent);
+            color: var(--accent-text);
+            border-color: var(--accent);
+        }
+
+        .cover-preview {
+            max-height: 90px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        .bulk-preview {
+            margin-top: 12px;
+            padding: 10px;
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        details summary {
+            cursor: pointer;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .library-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .library-controls input[type="text"],
+        .library-controls select {
+            padding: 6px 8px;
+            font-family: inherit;
+            color: var(--text);
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        .library-controls input[type="text"] {
+            flex: 1 1 220px;
+        }
+
+        .count-label {
+            color: var(--muted);
+            font-size: 0.9em;
+        }
+
+        .book-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .book-row.archived {
+            opacity: 0.55;
+        }
+
+        .book-row-cover {
+            width: 44px;
+            height: 66px;
+            object-fit: contain;
+            flex: none;
+        }
+
+        .book-row-main {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .book-row-title {
+            color: var(--heading);
+            font-weight: bold;
+            overflow-wrap: break-word;
+        }
+
+        .book-row-meta {
+            color: var(--muted);
+            font-size: 0.85em;
+            margin-bottom: 6px;
+        }
+
+        .book-row-notes {
+            width: 100%;
+            padding: 4px 6px;
+            font-family: inherit;
+            font-size: 0.9em;
+            color: var(--text);
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+
+        .book-row-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: none;
+        }
+
+        .book-row-actions button {
+            padding: 4px 10px;
+            font-family: inherit;
+            font-size: 0.85em;
+            color: var(--text);
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        .book-row-actions button.danger {
+            color: var(--danger);
+        }
+
+        @media (max-width: 760px) {
+            .panel {
+                padding: 12px 14px;
+            }
+
+            .book-row {
+                flex-wrap: wrap;
+            }
+
+            .book-row-actions {
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <a href="index.html">Upload</a> |
+        <a href="ranking.html">Rank Books</a> |
+        <a href="leaderboard.html">Leaderboard</a> |
+        <a href="books.html">My Books</a> |
+        <a href="about.html">About</a>
+        <button type="button" class="theme-toggle">☾ Dark</button>
+    </nav>
+
+    <h1>My Books</h1>
+    <h3 class="page-subtitle"><i>Add books by hand, write notes, and archive anything you have gone off.</i></h3>
+
+    <div id="status-message"></div>
+
+    <section class="panel">
+        <h2>Add a Book</h2>
+        <form id="add-form" class="stack-form">
+            <label>Title <span class="inline-hint">required</span>
+                <input type="text" id="add-title" required>
+            </label>
+            <label>Author
+                <input type="text" id="add-author">
+            </label>
+            <label>ISBN <span class="inline-hint">optional, used to find a cover automatically</span>
+                <input type="text" id="add-isbn">
+            </label>
+            <label>Cover image URL <span class="inline-hint">leave blank to use the ISBN or a placeholder</span>
+                <input type="url" id="add-cover">
+            </label>
+            <label>Or upload a cover image <span class="inline-hint">scaled down before it is saved</span>
+                <input type="file" id="add-cover-file" accept="image/*">
+            </label>
+            <label>Link <span class="inline-hint">optional, for example a Royal Road fiction page</span>
+                <input type="url" id="add-link">
+            </label>
+            <label>Notes
+                <textarea id="add-notes" rows="3"></textarea>
+            </label>
+            <div class="button-row">
+                <img id="add-preview" alt="" class="cover-preview" hidden>
+                <button type="submit" class="primary" id="add-btn">Add Book</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel">
+        <h2>Add Many at Once</h2>
+        <p class="field-hint">
+            One book per line, as <code>Title | Author | Cover image URL</code>. Only the title is needed. Tabs work as
+            separators too, so a spreadsheet column can be pasted straight in. Lines starting with # are ignored.
+        </p>
+        <details>
+            <summary>Royal Road and other web fiction</summary>
+            <p class="field-hint">
+                Royal Road has no public API and does not let other sites read its pages from your browser, so titles,
+                authors and covers cannot be fetched automatically. Pasting a fiction link on its own line still creates
+                the book, taking the title from the web address and keeping the link so you can click through. To get
+                the cover, right click the cover image on Royal Road, copy the image address, and put it as the third
+                field on that book's line.
+            </p>
+        </details>
+        <textarea id="bulk-input" rows="8"
+            placeholder="Mother of Learning | nobody103 | https://example.com/cover.jpg
+https://www.royalroad.com/fiction/21220/mother-of-learning
+The Wandering Inn | pirateaba"></textarea>
+        <div class="button-row">
+            <button type="button" class="primary" id="bulk-btn">Add These Books</button>
+            <button type="button" id="bulk-preview-btn">Preview</button>
+        </div>
+        <div id="bulk-preview" class="bulk-preview" hidden></div>
+    </section>
+
+    <section class="panel">
+        <h2>Your Library</h2>
+        <div class="library-controls">
+            <input type="text" id="filter" placeholder="Search title, author or notes">
+            <select id="show-filter">
+                <option value="active">Active only</option>
+                <option value="all">All books</option>
+                <option value="archived">Archived only</option>
+                <option value="custom">Added by hand</option>
+                <option value="noted">With notes</option>
+            </select>
+            <span id="count" class="count-label"></span>
+        </div>
+        <div id="library"></div>
+        <p id="storage-note" class="field-hint"></p>
+    </section>
+
+    <script>
+        let filterText = '';
+        let showMode = 'active';
+        let pendingCover = '';
+
+        function showStatus(message, kind) {
+            const box = document.getElementById('status-message');
+            box.textContent = message;
+            box.className = kind === 'error' ? 'is-error' : 'is-ok';
+        }
+
+        /* ------------------------------------------------------ cover upload */
+
+        // Covers live in localStorage alongside everything else, and browsers
+        // only give a site a few megabytes, so uploads are scaled down hard.
+        function fileToCoverDataUrl(file, maxWidth, maxHeight) {
+            return new Promise((resolve, reject) => {
+                if (!file.type || file.type.indexOf('image/') !== 0) {
+                    reject(new Error('That file is not an image.'));
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error('Could not read that image.'));
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onerror = () => reject(new Error('Could not decode that image.'));
+                    img.onload = () => {
+                        let width = img.naturalWidth;
+                        let height = img.naturalHeight;
+                        const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+                        width = Math.max(1, Math.round(width * scale));
+                        height = Math.max(1, Math.round(height * scale));
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.82));
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        /* ----------------------------------------------------------- library */
+
+        function visibleBooks() {
+            const needle = filterText.toLowerCase();
+            return books.filter(book => {
+                if (showMode === 'active' && book.active !== 1) return false;
+                if (showMode === 'archived' && book.active !== 0) return false;
+                if (showMode === 'custom' && book.source !== 'custom') return false;
+                if (showMode === 'noted' && !book.notes) return false;
+                if (!needle) return true;
+                return (book.title + ' ' + book.author + ' ' + (book.notes || '')).toLowerCase().indexOf(needle) !== -1;
+            }).sort((a, b) => b.elo - a.elo);
+        }
+
+        function bookRow(book) {
+            const row = document.createElement('div');
+            row.className = 'book-row' + (book.active === 0 ? ' archived' : '');
+
+            const img = document.createElement('img');
+            img.className = 'book-row-cover';
+            img.onerror = function () { this.onerror = null; this.src = 'images/placeholder.png'; };
+            img.src = book.cover_url || 'images/placeholder.png';
+            img.alt = '';
+            img.loading = 'lazy';
+            row.appendChild(img);
+
+            const main = document.createElement('div');
+            main.className = 'book-row-main';
+
+            const heading = document.createElement('div');
+            heading.className = 'book-row-title';
+            heading.textContent = book.title;
+            if (book.link) {
+                heading.appendChild(document.createTextNode(' '));
+                const anchor = document.createElement('a');
+                anchor.href = book.link;
+                anchor.target = '_blank';
+                anchor.rel = 'noopener noreferrer';
+                anchor.textContent = '(link)';
+                heading.appendChild(anchor);
+            }
+            main.appendChild(heading);
+
+            const meta = document.createElement('div');
+            meta.className = 'book-row-meta';
+            meta.textContent = book.author +
+                ' | ELO ' + Math.round(book.elo) +
+                ' | ' + (book.matchups || 0) + ' matchups' +
+                ' | ' + (book.source || 'goodreads') +
+                (book.active === 0 ? ' | archived' : '');
+            main.appendChild(meta);
+
+            const notes = document.createElement('textarea');
+            notes.className = 'book-row-notes';
+            notes.rows = 2;
+            notes.placeholder = 'Notes about this book';
+            notes.value = book.notes || '';
+            // Saved on blur rather than per keystroke, so typing stays smooth
+            // with a large library.
+            notes.addEventListener('blur', () => {
+                if (notes.value.trim() === (book.notes || '')) return;
+                if (updateBookFields(book.id, { notes: notes.value })) {
+                    showStatus('Notes saved for "' + book.title + '".', 'ok');
+                }
+            });
+            main.appendChild(notes);
+            row.appendChild(main);
+
+            const actions = document.createElement('div');
+            actions.className = 'book-row-actions';
+
+            const archiveBtn = document.createElement('button');
+            archiveBtn.type = 'button';
+            archiveBtn.textContent = book.active === 1 ? 'Archive' : 'Restore';
+            archiveBtn.addEventListener('click', () => {
+                setBookActive(book.id, book.active === 1 ? 0 : 1);
+                renderLibrary();
+            });
+            actions.appendChild(archiveBtn);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'danger';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.addEventListener('click', () => {
+                if (!confirm('Delete "' + book.title + '" permanently?\n\nArchiving keeps the book and its ELO score instead.')) return;
+                deleteBook(book.id);
+                showStatus('Deleted "' + book.title + '".', 'ok');
+                renderLibrary();
+            });
+            actions.appendChild(deleteBtn);
+
+            row.appendChild(actions);
+            return row;
+        }
+
+        function renderLibrary() {
+            const container = document.getElementById('library');
+            const matches = visibleBooks();
+
+            document.getElementById('count').textContent = matches.length + ' of ' + books.length + ' book(s)';
+
+            const usage = storageUsage();
+            document.getElementById('storage-note').textContent =
+                'Storage used: about ' + Math.round(usage.bytes / 1024) + ' KB. Browsers allow roughly 5 MB, and ' +
+                'uploaded covers are most of it. Export your rankings from the Leaderboard regularly.';
+
+            container.innerHTML = '';
+            if (!matches.length) {
+                const empty = document.createElement('p');
+                empty.className = 'field-hint';
+                empty.textContent = books.length === 0
+                    ? 'No books yet. Add one above, or upload a library export.'
+                    : 'No books match this filter.';
+                container.appendChild(empty);
+                return;
+            }
+            matches.forEach(book => container.appendChild(bookRow(book)));
+        }
+
+        /* ------------------------------------------------------------ wiring */
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('add-cover-file').addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                const preview = document.getElementById('add-preview');
+                if (!file) {
+                    pendingCover = '';
+                    preview.hidden = true;
+                    return;
+                }
+                try {
+                    pendingCover = await fileToCoverDataUrl(file, 200, 300);
+                    preview.src = pendingCover;
+                    preview.hidden = false;
+                    showStatus('Cover ready, about ' + Math.round(pendingCover.length / 1024) + ' KB after scaling.', 'ok');
+                } catch (error) {
+                    pendingCover = '';
+                    preview.hidden = true;
+                    showStatus(error.message, 'error');
+                }
+            });
+
+            document.getElementById('add-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const result = addCustomBook({
+                    title: document.getElementById('add-title').value,
+                    author: document.getElementById('add-author').value,
+                    isbn: document.getElementById('add-isbn').value,
+                    cover_url: document.getElementById('add-cover').value.trim() || pendingCover,
+                    link: document.getElementById('add-link').value,
+                    notes: document.getElementById('add-notes').value
+                });
+
+                if (!result.added) {
+                    showStatus(result.book
+                        ? '"' + result.book.title + '" is ' + result.reason + '.'
+                        : result.reason, 'error');
+                    return;
+                }
+
+                document.getElementById('add-form').reset();
+                pendingCover = '';
+                document.getElementById('add-preview').hidden = true;
+                showStatus('Added "' + result.book.title + '".', 'ok');
+                renderLibrary();
+            });
+
+            document.getElementById('bulk-preview-btn').addEventListener('click', () => {
+                const parsed = parseBulkInput(document.getElementById('bulk-input').value);
+                const box = document.getElementById('bulk-preview');
+                box.hidden = false;
+                box.innerHTML = '';
+
+                if (!parsed.entries.length) {
+                    box.textContent = 'Nothing to add yet.';
+                    return;
+                }
+                const list = document.createElement('ol');
+                parsed.entries.forEach(entry => {
+                    const item = document.createElement('li');
+                    item.textContent = entry.title +
+                        (entry.author ? ' by ' + entry.author : ' (no author)') +
+                        (entry.cover_url ? ' [cover]' : '') +
+                        (entry.link ? ' [link]' : '');
+                    list.appendChild(item);
+                });
+                box.appendChild(list);
+                if (parsed.skipped.length) {
+                    const note = document.createElement('p');
+                    note.className = 'field-hint';
+                    note.textContent = parsed.skipped.length + ' line(s) could not be read and will be skipped.';
+                    box.appendChild(note);
+                }
+            });
+
+            document.getElementById('bulk-btn').addEventListener('click', () => {
+                const parsed = parseBulkInput(document.getElementById('bulk-input').value);
+                if (!parsed.entries.length) {
+                    showStatus('Nothing to add. Enter at least one line.', 'error');
+                    return;
+                }
+
+                const result = addBooksBulk(parsed.entries);
+                if (!result.saved) return;   // addBooksBulk already reported it
+
+                let message = 'Added ' + result.added + ' book(s).';
+                if (result.duplicates.length) message += ' Skipped ' + result.duplicates.length + ' already in your library.';
+                if (parsed.skipped.length) message += ' ' + parsed.skipped.length + ' line(s) could not be read.';
+                showStatus(message, 'ok');
+
+                document.getElementById('bulk-input').value = '';
+                document.getElementById('bulk-preview').hidden = true;
+                renderLibrary();
+            });
+
+            document.getElementById('filter').addEventListener('input', (e) => {
+                filterText = e.target.value.trim();
+                renderLibrary();
+            });
+
+            document.getElementById('show-filter').addEventListener('change', (e) => {
+                showMode = e.target.value;
+                renderLibrary();
+            });
+
+            renderLibrary();
+        });
+    </script>
+</body>
+
+</html>

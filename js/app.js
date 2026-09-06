@@ -191,6 +191,8 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
                                 year_published: row["Year Published"] || '',
                                 original_publication_year: row["Original Publication Year"] || '',
                                 date_added: row["Date Added"] || '',
+                                notes: '',
+                                link: '',
                                 elo: 1500,
                                 matchups: 0,
                                 source: 'goodreads',
@@ -335,6 +337,8 @@ async function parseStorygraphCSV(file, existingBooks, progressCallback) {
                             year_published: '',
                             original_publication_year: '',
                             date_added: row['Date Added'] || '',
+                            notes: '',
+                            link: '',
                             elo: 1500,
                             matchups: 0,
                             source: 'storygraph',
@@ -382,6 +386,191 @@ async function parseLibraryCSV(file, existingBooks, progressCallback) {
         throw new Error('That looks like a rankings CSV. Please choose it in the "Previous Rankings CSV" box instead.');
     }
     throw new Error('Unrecognised CSV. Expected a Goodreads or StoryGraph library export.');
+}
+
+// ------------------------------------------------- custom books and notes
+
+// Books added by hand, rather than coming from a library export. They carry
+// source 'custom', which keeps them out of the archive sweep an import does.
+
+function addCustomBook(fields) {
+    const title = String(fields.title || '').trim();
+    if (!title) return { added: false, reason: 'A title is required.', book: null };
+
+    const candidate = {
+        id: generateUniqueId(),
+        isbn: normaliseIsbn(fields.isbn),
+        title: title,
+        author: String(fields.author || '').trim() || 'Unknown Author',
+        cover_url: String(fields.cover_url || '').trim() ||
+            (normaliseIsbn(fields.isbn) ? `https://covers.openlibrary.org/b/isbn/${normaliseIsbn(fields.isbn)}-L.jpg` : null),
+        num_pages: null,
+        additional_authors: '',
+        average_rating: '',
+        publisher: '',
+        year_published: '',
+        original_publication_year: '',
+        date_added: new Date().toISOString().slice(0, 10),
+        notes: String(fields.notes || '').trim(),
+        link: String(fields.link || '').trim(),
+        elo: 1500,
+        matchups: 0,
+        source: 'custom',
+        active: 1
+    };
+
+    const key = createBookKey(candidate);
+    const existing = books.find(book => createBookKey(book) === key);
+    if (existing) return { added: false, reason: 'already in your library', book: existing };
+
+    books.push(candidate);
+    return saveBooks()
+        ? { added: true, book: candidate }
+        : { added: false, reason: 'could not be saved', book: null };
+}
+
+const EDITABLE_BOOK_FIELDS = ['title', 'author', 'cover_url', 'notes', 'link'];
+
+function updateBookFields(bookId, changes) {
+    const book = books.find(b => b.id === bookId);
+    if (!book) return false;
+
+    EDITABLE_BOOK_FIELDS.forEach(field => {
+        if (!Object.prototype.hasOwnProperty.call(changes, field)) return;
+        book[field] = String(changes[field] === null || changes[field] === undefined ? '' : changes[field]).trim();
+    });
+    if (Object.prototype.hasOwnProperty.call(changes, 'isbn')) {
+        book.isbn = normaliseIsbn(changes.isbn);
+    }
+    if (Object.prototype.hasOwnProperty.call(changes, 'active')) {
+        book.active = Number(changes.active) === 0 ? 0 : 1;
+    }
+    if (!book.title) book.title = 'Unknown Title';
+    return saveBooks();
+}
+
+function setBookActive(bookId, active) {
+    return updateBookFields(bookId, { active: active });
+}
+
+function deleteBook(bookId) {
+    const before = books.length;
+    const remaining = books.filter(b => b.id !== bookId);
+    if (remaining.length === before) return false;
+    books.length = 0;
+    remaining.forEach(b => books.push(b));
+    return saveBooks();
+}
+
+// ------------------------------------------------------------- bulk adding
+
+// Royal Road and similar sites cannot be read from the browser: no public API
+// and no CORS headers, so a fetch from this origin is blocked before it is
+// sent. A pasted link is therefore turned into a title from its slug, with the
+// link kept so it stays clickable.
+function titleFromUrl(url) {
+    let path = url;
+    try {
+        path = new URL(url).pathname;
+    } catch (error) {
+        // Not a parseable URL; treat the whole string as a path.
+    }
+    const segments = path.split('/').filter(Boolean);
+    let slug = '';
+    for (let i = segments.length - 1; i >= 0; i--) {
+        if (!/^\d+$/.test(segments[i])) { slug = segments[i]; break; }
+    }
+    if (!slug) return '';
+    return slug
+        .replace(/\.[a-z0-9]{1,5}$/i, '')
+        .replace(/[-_+]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// One book per line:
+//   Title
+//   Title | Author
+//   Title | Author | Cover image URL
+//   https://www.royalroad.com/fiction/12345/some-story
+// Tabs work as separators too, so a spreadsheet column pastes straight in.
+// Blank lines and lines starting with # are ignored.
+function parseBulkInput(text) {
+    const entries = [];
+    const skipped = [];
+
+    String(text || '').split(/\r?\n/).forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.charAt(0) === '#') return;
+
+        if (/^https?:\/\//i.test(trimmed)) {
+            const derived = titleFromUrl(trimmed);
+            if (!derived) { skipped.push(trimmed); return; }
+            entries.push({ title: derived, author: '', cover_url: '', link: trimmed });
+            return;
+        }
+
+        const parts = trimmed.split(/\s*[|\t]\s*/);
+        const title = (parts[0] || '').trim();
+        if (!title) { skipped.push(trimmed); return; }
+
+        const rest = parts.slice(1).map(p => p.trim()).filter(Boolean);
+        const cover = rest.find(p => /^https?:\/\//i.test(p) && /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(p)) || '';
+        const link = rest.find(p => /^https?:\/\//i.test(p) && p !== cover) || '';
+        const author = rest.find(p => !/^https?:\/\//i.test(p)) || '';
+
+        entries.push({ title: title, author: author, cover_url: cover, link: link });
+    });
+
+    return { entries: entries, skipped: skipped };
+}
+
+// Adds many at once, skipping any already present, and saving once at the end
+// rather than per book.
+function addBooksBulk(entries) {
+    const added = [];
+    const duplicates = [];
+
+    entries.forEach(entry => {
+        const title = String(entry.title || '').trim();
+        if (!title) return;
+
+        const candidate = {
+            id: generateUniqueId(),
+            isbn: null,
+            title: title,
+            author: String(entry.author || '').trim() || 'Unknown Author',
+            cover_url: String(entry.cover_url || '').trim() || null,
+            num_pages: null,
+            additional_authors: '',
+            average_rating: '',
+            publisher: '',
+            year_published: '',
+            original_publication_year: '',
+            date_added: new Date().toISOString().slice(0, 10),
+            notes: String(entry.notes || '').trim(),
+            link: String(entry.link || '').trim(),
+            elo: 1500,
+            matchups: 0,
+            source: 'custom',
+            active: 1
+        };
+
+        const key = createBookKey(candidate);
+        if (books.some(book => createBookKey(book) === key)) { duplicates.push(title); return; }
+        books.push(candidate);
+        added.push(candidate);
+    });
+
+    const saved = saveBooks();
+    return { added: saved ? added.length : 0, duplicates: duplicates, saved: saved };
+}
+
+// Rough size of what is stored, for the warning on the manage page.
+function storageUsage() {
+    const raw = readStoredValue('books') || '';
+    return { bytes: raw.length, books: books.length };
 }
 
 // Background Cover Fetcher
@@ -517,6 +706,8 @@ async function parseRankingsCSV(file, existingBooks) {
                     });
 
                     // Update existing books with ranking data
+                    const restored = [];
+
                     results.data.forEach(row => {
                         const key = createBookKey(row);
                         const book = existingBooksMap.get(key);
@@ -524,10 +715,47 @@ async function parseRankingsCSV(file, existingBooks) {
                         if (book) {
                             book.elo = parseFloat(row["ELO"]) || 1500;
                             book.matchups = parseInt(row["Matchups"]) || 0;
+                            // Compared explicitly: parseInt("0") is falsy, so a
+                            // "|| 1" here would un-archive every archived book.
+                            if (row["Active"] !== undefined && String(row["Active"]).trim() !== '') {
+                                book.active = parseInt(row["Active"]) === 0 ? 0 : 1;
+                            }
+                            // Only ever fill notes in. A CSV without the column
+                            // must not wipe notes already written.
+                            if (row["Notes"]) book.notes = row["Notes"];
+                            if (row["Link"]) book.link = row["Link"];
+                            return;
+                        }
+
+                        // A book added by hand lives only in this CSV, so it is
+                        // recreated rather than dropped. Library books are left
+                        // alone: they come back from a library export.
+                        if (String(row["Source"] || '').trim() === 'custom' && String(row["Title"] || '').trim()) {
+                            restored.push({
+                                id: generateUniqueId(),
+                                isbn: normaliseIsbn(row["ISBN13"] || row["ISBN"]),
+                                title: row["Title"],
+                                author: row["Author"] || 'Unknown Author',
+                                cover_url: row["Cover URL"] || null,
+                                num_pages: null,
+                                additional_authors: '',
+                                average_rating: '',
+                                publisher: '',
+                                year_published: '',
+                                original_publication_year: '',
+                                date_added: row["Date Added"] || '',
+                                notes: row["Notes"] || '',
+                                link: row["Link"] || '',
+                                elo: parseFloat(row["ELO"]) || 1500,
+                                matchups: parseInt(row["Matchups"]) || 0,
+                                source: 'custom',
+                                active: parseInt(row["Active"]) === 0 ? 0 : 1
+                            });
                         }
                     });
 
-                    resolve(existingBooks);
+                    if (restored.length) console.log('Restored', restored.length, 'custom books from the rankings CSV');
+                    resolve(existingBooks.concat(restored));
                 } catch (error) {
                     console.error('Error processing Rankings data:', error);
                     reject(error);
@@ -556,7 +784,12 @@ function generateCSV(books) {
         "Publisher": book.publisher,
         "Year Published": book.year_published,
         "Original Publication Year": book.original_publication_year,
-        "Date Added": book.date_added
+        "Date Added": book.date_added,
+        "Source": book.source || 'goodreads',
+        "Active": book.active === 0 ? 0 : 1,
+        "Notes": book.notes || '',
+        "Link": book.link || '',
+        "Cover URL": book.cover_url || ''
     }));
 
     return Papa.unparse(data);
