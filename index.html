@@ -52,8 +52,11 @@
         document.getElementById('clear-storage').addEventListener('click', function () {
             if (confirm('Are you sure you want to clear all Goodreads ELO Ranker data? This will remove all your rankings and cannot be undone.')) {
                 // Only remove our specific data
-                localStorage.removeItem('books');
-                alert('All Goodreads ELO Ranker data has been cleared. You can now start fresh!');
+                if (removeStoredValue('books')) {
+                    alert('All Goodreads ELO Ranker data has been cleared. You can now start fresh!');
+                } else {
+                    alert('Could not clear your data because browser storage is unavailable.');
+                }
             }
         });
 
@@ -77,7 +80,7 @@
             statusDiv.style.color = "#333";
 
             // Get existing books from localStorage
-            let loadedBooks = JSON.parse(localStorage.getItem('books')) || [];
+            let loadedBooks = loadStoredBooks();
 
             try {
                 // Process files in the correct order:
@@ -103,7 +106,13 @@
                 }
 
                 // Save final merged books to localStorage
-                localStorage.setItem('books', JSON.stringify(loadedBooks));
+                if (!writeStoredJSON('books', loadedBooks)) {
+                    statusDiv.textContent = "Could not save: browser storage is full or blocked.";
+                    statusDiv.style.color = "red";
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = "Upload &/or Merge";
+                    return;
+                }
                 statusDiv.textContent = "Upload complete! Redirecting...";
                 statusDiv.style.color = "green";
                 setTimeout(() => {

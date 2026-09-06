@@ -167,7 +167,7 @@
 
         function displayLeaderboard() {
             const tableBody = document.getElementById('leaderboard-body');
-            const books = JSON.parse(localStorage.getItem('books')) || [];
+            const books = loadStoredBooks();
             const sortedBooks = books.filter(b => b.active === 1).sort((a, b) => b.elo - a.elo);
 
             sortedBooks.forEach((book, index) => {
@@ -282,7 +282,7 @@
 
         function generateCSVForDownload() {
             // Get books from localStorage and use PapaParse-based generateCSV from app.js
-            const books = JSON.parse(localStorage.getItem('books')) || [];
+            const books = loadStoredBooks();
 
             // Use the generateCSV function from app.js if available
             if (typeof window.generateCSV === 'function') {
@@ -331,7 +331,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const books = JSON.parse(localStorage.getItem('books')) || [];
+            const books = loadStoredBooks();
             const activeBooks = books.filter(b => b.active === 1);
 
             if (activeBooks.length === 0) {

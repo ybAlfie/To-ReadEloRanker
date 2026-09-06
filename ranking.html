@@ -143,12 +143,12 @@
         }
 
         function updateProgressBar() {
-            const books = JSON.parse(localStorage.getItem('books')) || [];
+            const books = loadStoredBooks();
             const activeBooks = books.filter(b => b.active === 1);
 
             if (activeBooks.length === 0) return;
 
-            const TARGET_MATCHUPS = parseInt(localStorage.getItem('targetMatchups')) || 5;
+            const TARGET_MATCHUPS = parseInt(readStoredValue('targetMatchups')) || 5;
 
             // Count fully completed books for the text
             const booksWithEnoughMatchups = activeBooks.filter(b => (b.matchups || 0) >= TARGET_MATCHUPS).length;
@@ -188,17 +188,17 @@
         function updateTargetMatchups() {
             const select = document.getElementById('target-matchups-select');
             if (select) {
-                localStorage.setItem('targetMatchups', select.value);
+                writeStoredValue('targetMatchups', select.value);
                 updateProgressBar();
             }
         }
 
         function loadLimitSettings() {
-            const settings = JSON.parse(localStorage.getItem('rankingLimitSettings')) || {
+            const settings = readStoredJSON('rankingLimitSettings', {
                 enabled: false,
                 value: 50,
                 type: 'percent'
-            };
+            });
 
             const limitEnabled = document.getElementById('limit-enabled');
             const limitValue = document.getElementById('limit-value');
@@ -225,7 +225,7 @@
                 value: document.getElementById('limit-value').value,
                 type: document.getElementById('limit-type').value
             };
-            localStorage.setItem('rankingLimitSettings', JSON.stringify(settings));
+            writeStoredJSON('rankingLimitSettings', settings);
         }
 
         function toggleLimitControls() {
@@ -240,7 +240,7 @@
         }
 
         function getNextMatchup() {
-            const settings = JSON.parse(localStorage.getItem('rankingLimitSettings')) || { enabled: false };
+            const settings = readStoredJSON('rankingLimitSettings', { enabled: false });
             const options = {
                 limitEnabled: settings.enabled,
                 limitValue: settings.value,
@@ -346,7 +346,15 @@
             }
         }
 
+        // Set while a result is being applied. Without it a double click, or a
+        // held arrow key repeating, scores the same pair more than once during
+        // the 200ms highlight.
+        let isScoring = false;
+
         async function chooseWinner(winnerId, loserId) {
+            if (isScoring || !currentMatchup) return;
+            isScoring = true;
+
             let winnerBook, loserBook;
 
             if (winnerId === currentMatchup.book1.id) {
@@ -372,13 +380,14 @@
             // Show the update briefly before next matchup
             setTimeout(() => {
                 chosenContainer.classList.remove('chosen');
+                isScoring = false;
                 getNextMatchup();
                 updateProgressBar();
             }, 200);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const books = JSON.parse(localStorage.getItem('books')) || [];
+            const books = loadStoredBooks();
             const activeBooks = books.filter(b => b.active === 1);
 
             if (activeBooks.length < 2) {
@@ -403,7 +412,8 @@
 
             // Keyboard controls
             document.addEventListener('keydown', (e) => {
-                if (!currentMatchup) return;
+                if (!currentMatchup || isScoring) return;
+                if (e.repeat) return;   // holding a key must not score repeatedly
                 const { book1, book2 } = currentMatchup;
                 if (e.key === 'ArrowLeft') {
                     chooseWinner(book1.id, book2.id);

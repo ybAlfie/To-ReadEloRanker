@@ -1,3 +1,76 @@
+// ---------------------------------------------------------------- storage
+//
+// Every read goes through these. A corrupt value, or a browser with storage
+// blocked (private mode, "block third party data"), used to throw and take the
+// whole page down with it.
+
+function readStoredValue(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (error) {
+        console.error(`Storage is unavailable, cannot read "${key}":`, error);
+        return null;
+    }
+}
+
+function writeStoredValue(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (error) {
+        console.error(`Could not save "${key}":`, error);
+        return false;
+    }
+}
+
+function removeStoredValue(key) {
+    try {
+        localStorage.removeItem(key);
+        return true;
+    } catch (error) {
+        console.error(`Could not clear "${key}":`, error);
+        return false;
+    }
+}
+
+function readStoredJSON(key, fallback) {
+    const raw = readStoredValue(key);
+    if (raw === null || raw === '') return fallback;
+    try {
+        const parsed = JSON.parse(raw);
+        return (parsed === null || parsed === undefined) ? fallback : parsed;
+    } catch (error) {
+        console.error(`Stored value for "${key}" was corrupt and has been ignored:`, error);
+        return fallback;
+    }
+}
+
+function loadStoredBooks() {
+    const stored = readStoredJSON('books', []);
+    return Array.isArray(stored) ? stored : [];
+}
+
+// Returns false if the write failed, so callers can avoid telling the user
+// their work was saved when it was not.
+function writeStoredJSON(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+        return true;
+    } catch (error) {
+        console.error(`Could not save "${key}":`, error);
+        if (error && (error.name === 'QuotaExceededError' || error.code === 22)) {
+            alert(
+                'Your browser storage is full, so that change could not be saved.\n\n' +
+                'Export your rankings from the Leaderboard, then use "Clear All Data" ' +
+                'on the Upload page and re-import to free up space.'
+            );
+        } else {
+            alert('That change could not be saved because browser storage is unavailable.');
+        }
+        return false;
+    }
+}
+
 // Parse Goodreads CSV
 async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
     return new Promise((resolve, reject) => {
@@ -697,12 +770,12 @@ async function fetchBookCover(title, author, isbn) {
 }
 
 // Initialize books array
-let books = JSON.parse(localStorage.getItem('books')) || [];
+let books = loadStoredBooks();
 
 // One-time migration: Reset for fixed zoom issue
 // Version 9: Fixed zoom=3 causing placeholders for low-res Google Books images
 const COVER_LOGIC_VERSION = 9; // Increment this to force a retry reset
-if (localStorage.getItem('coverLogicVersion') !== String(COVER_LOGIC_VERSION)) {
+if (readStoredValue('coverLogicVersion') !== String(COVER_LOGIC_VERSION)) {
     let resetCount = 0;
     books.forEach(book => {
         // Reset failed flags - covers that failed due to zoom issue can be retried
@@ -713,11 +786,11 @@ if (localStorage.getItem('coverLogicVersion') !== String(COVER_LOGIC_VERSION)) {
     });
     if (resetCount > 0) {
         console.log(`Migration v9: Reset ${resetCount} books to retry with fixed zoom setting`);
-        localStorage.setItem('books', JSON.stringify(books));
+        writeStoredJSON('books', books);
     }
-    localStorage.setItem('coverLogicVersion', String(COVER_LOGIC_VERSION));
+    writeStoredValue('coverLogicVersion', String(COVER_LOGIC_VERSION));
 }
 
 function saveBooks() {
-    localStorage.setItem('books', JSON.stringify(books));
+    return writeStoredJSON('books', books);
 }

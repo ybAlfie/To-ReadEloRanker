@@ -1,1 +1,8 @@
 test files/
+
+# Personal library exports - keep local, never commit
+*.csv
+
+# Scratch
+New folder/
+New folder (2)/
