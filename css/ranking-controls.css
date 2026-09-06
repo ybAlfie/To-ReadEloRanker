@@ -257,3 +257,32 @@ input:checked+.slider:before {
 .slider.round:before {
     border-radius: 50%;
 }
+/* Notes, written straight into the info popup */
+.info-popup .note-label {
+    display: block;
+    margin: 12px 0 4px;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.info-popup .note-box {
+    width: 100%;
+    padding: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+.info-popup .note-status {
+    min-height: 14px;
+    margin-top: 2px;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--muted-soft);
+}

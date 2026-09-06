@@ -131,6 +131,12 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
 
                     // Filter first to know total count for progress
                     const rowsToProcess = results.data.filter(row => row["Exclusive Shelf"] === "to-read");
+                    // The read shelf is kept as well, parked and inactive, so a
+                    // book can be ticked for a reread on the My Books page
+                    // without re-importing anything.
+                    const readRows = results.data.filter(row =>
+                        row["Exclusive Shelf"] === "read" && String(row["Title"] || '').trim() !== ''
+                    );
                     const totalToProcess = rowsToProcess.length;
 
                     if (progressCallback) progressCallback(`Found ${totalToProcess} books to process...`);
@@ -171,6 +177,7 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
                                 original_publication_year: row["Original Publication Year"] || existingBook.original_publication_year,
                                 date_added: row["Date Added"] || existingBook.date_added,
                                 source: existingBook.source || 'goodreads',
+                                shelf: 'to-read',
                                 active: 1
                             });
                         } else {
@@ -196,6 +203,7 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
                                 elo: 1500,
                                 matchups: 0,
                                 source: 'goodreads',
+                                shelf: 'to-read',
                                 active: 1
                             });
                         }
@@ -203,9 +211,60 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
 
                     console.log('Found', wantToReadBooks.length, 'want to read books');
 
-                    // Create a map of new books using our key function
+                    const readBooks = readRows.map(row => {
+                        const isbn = cleanISBN(row["ISBN13"]) || cleanISBN(row["ISBN"]);
+                        const existingBook = existingBooksMap.get(createBookKey(row));
+                        const numPages = getNumPages(row);
+
+                        if (existingBook) {
+                            return {
+                                ...existingBook,
+                                title: row["Title"] || existingBook.title,
+                                author: row["Author"] || existingBook.author,
+                                isbn: isbn || existingBook.isbn,
+                                num_pages: numPages !== null ? numPages : (existingBook.num_pages || null),
+                                publisher: row["Publisher"] || existingBook.publisher,
+                                year_published: row["Year Published"] || existingBook.year_published,
+                                date_added: row["Date Added"] || existingBook.date_added,
+                                source: existingBook.source || 'goodreads',
+                                shelf: 'read',
+                                // Preserve a reread the reader has already ticked.
+                                active: existingBook.active === 1 && existingBook.shelf === 'read' ? 1 : 0
+                            };
+                        }
+
+                        return {
+                            id: generateUniqueId(),
+                            isbn: isbn,
+                            title: row["Title"],
+                            author: row["Author"] || 'Unknown Author',
+                            cover_url: isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg` : null,
+                            num_pages: numPages,
+                            additional_authors: row["Additional Authors"] || '',
+                            average_rating: row["Average Rating"] || '',
+                            publisher: row["Publisher"] || '',
+                            year_published: row["Year Published"] || '',
+                            original_publication_year: row["Original Publication Year"] || '',
+                            date_added: row["Date Added"] || '',
+                            date_read: row["Date Read"] || '',
+                            my_rating: row["My Rating"] || '',
+                            notes: '',
+                            link: '',
+                            elo: 1500,
+                            matchups: 0,
+                            source: 'goodreads',
+                            shelf: 'read',
+                            active: 0
+                        };
+                    });
+
+                    console.log('Found', readBooks.length, 'books on the read shelf');
+
+                    // Create a map of new books using our key function. Read
+                    // books are included so the archive sweep below leaves them
+                    // alone.
                     const newBooksMap = new Map(
-                        wantToReadBooks.map(book => [createBookKey(book), book])
+                        wantToReadBooks.concat(readBooks).map(book => [createBookKey(book), book])
                     );
 
                     // Books missing from this import are archived, but only if
@@ -215,7 +274,7 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
                         .filter(book => !newBooksMap.has(createBookKey(book)))
                         .map(book => archiveIfOwnedBy(book, 'goodreads'));
 
-                    const mergedBooks = [...wantToReadBooks, ...inactiveBooks];
+                    const mergedBooks = [...wantToReadBooks, ...readBooks, ...inactiveBooks];
                     console.log('Final merged book count:', mergedBooks.length);
 
                     resolve(mergedBooks);
@@ -240,6 +299,7 @@ function bookSource(book) {
 
 function archiveIfOwnedBy(book, source) {
     if (bookSource(book) !== source) return book;   // another library owns it
+    if (book.shelf === 'read') return book;         // parked, not on the to-read shelf
     console.log(`Marking as inactive: "${book.title}" by ${book.author}`);
     return { ...book, active: 0 };
 }
@@ -297,10 +357,11 @@ async function parseStorygraphCSV(file, existingBooks, progressCallback) {
                         existingBooksMap.set(createBookKey(book), book);
                     });
 
-                    const rowsToProcess = results.data.filter(row =>
-                        String(row['Read Status'] || '').trim().toLowerCase() === 'to-read' &&
-                        String(row['Title'] || '').trim() !== ''
-                    );
+                    const readStatus = row => String(row['Read Status'] || '').trim().toLowerCase();
+                    const hasTitle = row => String(row['Title'] || '').trim() !== '';
+
+                    const rowsToProcess = results.data.filter(row => readStatus(row) === 'to-read' && hasTitle(row));
+                    const readRows = results.data.filter(row => readStatus(row) === 'read' && hasTitle(row));
 
                     if (progressCallback) progressCallback(`Found ${rowsToProcess.length} books to process...`);
 
@@ -319,7 +380,12 @@ async function parseStorygraphCSV(file, existingBooks, progressCallback) {
                                 cover_url: existingBook.cover_url ||
                                     (isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg` : null),
                                 date_added: row['Date Added'] || existingBook.date_added,
+                                // StoryGraph carries no page count, publisher or
+                                // year, so anything already known is kept.
+                                format: row['Format'] || existingBook.format || '',
+                                tags: row['Tags'] || existingBook.tags || '',
                                 source: existingBook.source || 'storygraph',
+                                shelf: 'to-read',
                                 active: 1
                             };
                         }
@@ -337,26 +403,78 @@ async function parseStorygraphCSV(file, existingBooks, progressCallback) {
                             year_published: '',
                             original_publication_year: '',
                             date_added: row['Date Added'] || '',
+                            format: row['Format'] || '',
+                            tags: row['Tags'] || '',
                             notes: '',
                             link: '',
                             elo: 1500,
                             matchups: 0,
                             source: 'storygraph',
+                            shelf: 'to-read',
                             active: 1
                         };
                     });
 
+                    const readBooks = readRows.map(row => {
+                        const isbn = normaliseIsbn(row['ISBN/UID']);
+                        const title = row['Title'];
+                        const author = row['Authors'] || row['Contributors'] || 'Unknown Author';
+                        const existingBook = existingBooksMap.get(createBookKey({ isbn, title, author }));
+
+                        if (existingBook) {
+                            return {
+                                ...existingBook,
+                                title: title,
+                                author: author,
+                                isbn: isbn || existingBook.isbn,
+                                format: row['Format'] || existingBook.format || '',
+                                tags: row['Tags'] || existingBook.tags || '',
+                                source: existingBook.source || 'storygraph',
+                                shelf: 'read',
+                                active: existingBook.active === 1 && existingBook.shelf === 'read' ? 1 : 0
+                            };
+                        }
+
+                        return {
+                            id: generateUniqueId(),
+                            isbn: isbn,
+                            title: title,
+                            author: author,
+                            cover_url: isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg` : null,
+                            num_pages: null,
+                            additional_authors: row['Contributors'] || '',
+                            average_rating: '',
+                            publisher: '',
+                            year_published: '',
+                            original_publication_year: '',
+                            date_added: row['Date Added'] || '',
+                            date_read: row['Last Date Read'] || '',
+                            my_rating: row['Star Rating'] || '',
+                            format: row['Format'] || '',
+                            tags: row['Tags'] || '',
+                            notes: '',
+                            link: '',
+                            elo: 1500,
+                            matchups: 0,
+                            source: 'storygraph',
+                            shelf: 'read',
+                            active: 0
+                        };
+                    });
+
+                    console.log('Found', readBooks.length, 'books on the read shelf');
+
                     console.log('Found', wantToReadBooks.length, 'want to read books');
 
                     const newBooksMap = new Map(
-                        wantToReadBooks.map(book => [createBookKey(book), book])
+                        wantToReadBooks.concat(readBooks).map(book => [createBookKey(book), book])
                     );
 
                     const inactiveBooks = existingBooks
                         .filter(book => !newBooksMap.has(createBookKey(book)))
                         .map(book => archiveIfOwnedBy(book, 'storygraph'));
 
-                    const mergedBooks = [...wantToReadBooks, ...inactiveBooks];
+                    const mergedBooks = [...wantToReadBooks, ...readBooks, ...inactiveBooks];
                     console.log('Final merged book count:', mergedBooks.length);
                     resolve(mergedBooks);
                 } catch (error) {
@@ -662,6 +780,98 @@ async function fetchMissingCoverForBook(book) {
     return false;
 }
 
+// ------------------------------------------------------ metadata back-fill
+//
+// A StoryGraph export carries no page count, publisher or year, and records
+// saved by very old versions have none either, so the ranking line loses its
+// "| 384 pages" and the info popup has nothing to show. These are filled in
+// from the same APIs the cover fetcher already uses.
+
+function bookNeedsMetadata(book) {
+    if (!book || book.metadata_fetch_failed) return false;
+    const missingPages = book.num_pages === null || book.num_pages === undefined || book.num_pages === '';
+    return missingPages && Boolean(book.title);
+}
+
+async function fetchBookMetadata(title, author, isbn) {
+    const query = isbn
+        ? `isbn:${isbn}`
+        : `intitle:${encodeURIComponent(title)}${author ? '+inauthor:' + encodeURIComponent(author) : ''}`;
+
+    try {
+        const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=5`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (!data.items || !data.items.length) return null;
+
+        const normalize = text => String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        const wantedTitle = normalize(title);
+
+        for (const item of data.items) {
+            const info = item.volumeInfo;
+            if (!info) continue;
+
+            // With no ISBN to pin it down, only trust a result whose title
+            // actually matches, or the page count could belong to another book.
+            if (!isbn) {
+                const resultTitle = normalize(info.title);
+                const matches = resultTitle === wantedTitle ||
+                    resultTitle.indexOf(wantedTitle) === 0 ||
+                    wantedTitle.indexOf(resultTitle) === 0;
+                if (!matches) continue;
+            }
+
+            const pages = Number(info.pageCount);
+            const year = info.publishedDate ? String(info.publishedDate).slice(0, 4) : '';
+            if (!pages && !info.publisher && !year) continue;
+
+            return {
+                num_pages: Number.isFinite(pages) && pages > 0 ? pages : null,
+                publisher: info.publisher || '',
+                year_published: year
+            };
+        }
+        return null;
+    } catch (error) {
+        console.warn(`Failed to fetch metadata for "${title}":`, error);
+        return null;
+    }
+}
+
+async function fetchMissingMetadataForBook(book) {
+    if (!bookNeedsMetadata(book) || isFetchingCover) return false;
+
+    isFetchingCover = true;   // shares the lock, so only one request is in flight
+    try {
+        const found = await fetchBookMetadata(book.title, book.author, book.isbn);
+        const index = books.findIndex(b => b.id === book.id);
+        if (index === -1) return false;
+
+        if (!found) {
+            books[index].metadata_fetch_failed = true;
+            saveBooks();
+            return false;
+        }
+
+        if (found.num_pages) books[index].num_pages = found.num_pages;
+        if (found.publisher && !books[index].publisher) books[index].publisher = found.publisher;
+        if (found.year_published && !books[index].year_published) books[index].year_published = found.year_published;
+        // Nothing usable came back, so do not ask again.
+        if (!found.num_pages) books[index].metadata_fetch_failed = true;
+        saveBooks();
+
+        window.dispatchEvent(new CustomEvent('bookMetadataUpdated', {
+            detail: { bookId: book.id, book: books[index] }
+        }));
+        return true;
+    } catch (error) {
+        console.warn(`Error back-filling metadata for ${book.title}:`, error);
+        return false;
+    } finally {
+        isFetchingCover = false;
+    }
+}
+
 function startBackgroundCoverFetcher() {
     // Run every 2 seconds
     setInterval(async () => {
@@ -680,6 +890,14 @@ function startBackgroundCoverFetcher() {
         if (booksNeedingCover.length > 0) {
             const randomBook = booksNeedingCover[Math.floor(Math.random() * booksNeedingCover.length)];
             await fetchMissingCoverForBook(randomBook);
+            return;
+        }
+
+        // Covers are all settled, so start filling in the missing page counts.
+        const booksNeedingMetadata = activeBooks.filter(bookNeedsMetadata);
+        if (booksNeedingMetadata.length > 0) {
+            const randomBook = booksNeedingMetadata[Math.floor(Math.random() * booksNeedingMetadata.length)];
+            await fetchMissingMetadataForBook(randomBook);
         }
     }, 2000);
 }

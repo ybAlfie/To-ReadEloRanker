@@ -110,8 +110,15 @@
                     starting with # are ignored.
                 </li>
                 <li><strong>Notes:</strong><br>
-                    Every book has a notes box on the My Books page. Notes save when you click away from the box, and
-                    they are kept in your rankings CSV. A later library import will never overwrite a note you wrote.
+                    Every book has a notes box on the My Books page, and the same box sits inside the info panel on the
+                    Rank Books page, so you can write a note on a book while comparing it. Click the i on a cover to
+                    open it. Notes save when you click away from the box, and they are kept in your rankings CSV. A
+                    later library import will never overwrite a note you wrote.
+                </li>
+                <li><strong>Rereads:</strong><br>
+                    Your read shelf is imported alongside your want to read list, but kept out of matchups. On the My
+                    Books page you can search it and tick anything you would happily read again, which adds it to the
+                    ranking pool. Re-importing your library will not undo those ticks.
                 </li>
                 <li><strong>Archive or Delete:</strong><br>
                     Archiving keeps a book and its ELO score but stops it appearing in matchups, and it can be restored
@@ -135,6 +142,26 @@
                 <li><strong>Add the Covers:</strong><br>
                     To get a cover, right click the cover image on Royal Road, copy the image address, and put it as the
                     third field on that book's line, after the title and the author.
+                </li>
+            </ul>
+        </section>
+
+        <section id="faq-missing-details">
+            <h3>Missing Page Counts and Book Details:</h3>
+            <p>
+                A Goodreads export carries the page count, publisher and year for every book. A StoryGraph export does
+                not, and books saved by very old versions of this site have none either, so their info panel is thin and
+                the page count is missing next to the author.
+            </p>
+            <ul>
+                <li><strong>They Are Filled In Automatically:</strong><br>
+                    Once covers have finished loading, the site looks up the missing page counts in the background, a
+                    book at a time, and the ranking page updates as they arrive. A large library takes a while, so
+                    leave the Rank Books page open and it will catch up.
+                </li>
+                <li><strong>Or Upload Your Goodreads Export Too:</strong><br>
+                    If a book is on both services, importing your Goodreads export fills in everything StoryGraph left
+                    out straight away. Importing one library never removes books from the other.
                 </li>
             </ul>
         </section>

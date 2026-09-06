@@ -125,6 +125,46 @@
             font-size: 0.9em;
         }
 
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            font-size: 0.9em;
+        }
+
+        .reread-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+
+        .reread-row:hover {
+            background-color: var(--bg);
+        }
+
+        .reread-text {
+            min-width: 0;
+            overflow-wrap: break-word;
+        }
+
+        .reread-title {
+            color: var(--heading);
+        }
+
+        .reread-meta {
+            color: var(--muted);
+            font-size: 0.85em;
+        }
+
+        #reread-list {
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
         .book-row {
             display: flex;
             gap: 12px;
@@ -285,6 +325,22 @@ The Wandering Inn | pirateaba"></textarea>
     </section>
 
     <section class="panel">
+        <h2>Books You Have Read</h2>
+        <p class="field-hint">
+            Your read shelf is imported alongside your want to read list, but kept out of matchups. Search it here and
+            tick anything you would happily read again to add it to the ranking pool.
+        </p>
+        <div class="library-controls">
+            <input type="text" id="reread-filter" placeholder="Search your read books">
+            <label class="checkbox-label">
+                <input type="checkbox" id="reread-only-included"> Show only the ones I picked
+            </label>
+            <span id="reread-count" class="count-label"></span>
+        </div>
+        <div id="reread-list"></div>
+    </section>
+
+    <section class="panel">
         <h2>Your Library</h2>
         <div class="library-controls">
             <input type="text" id="filter" placeholder="Search title, author or notes">
@@ -294,6 +350,7 @@ The Wandering Inn | pirateaba"></textarea>
                 <option value="archived">Archived only</option>
                 <option value="custom">Added by hand</option>
                 <option value="noted">With notes</option>
+                <option value="reread">Picked for a reread</option>
             </select>
             <span id="count" class="count-label"></span>
         </div>
@@ -348,16 +405,114 @@ The Wandering Inn | pirateaba"></textarea>
 
         /* ----------------------------------------------------------- library */
 
+        function isRead(book) {
+            return book.shelf === 'read';
+        }
+
+        function matchesText(book, needle) {
+            if (!needle) return true;
+            return (book.title + ' ' + book.author + ' ' + (book.notes || '')).toLowerCase().indexOf(needle) !== -1;
+        }
+
         function visibleBooks() {
             const needle = filterText.toLowerCase();
             return books.filter(book => {
+                if (showMode === 'reread') return isRead(book) && book.active === 1 && matchesText(book, needle);
+                // Read books have their own panel above, so they are kept out
+                // of this list unless "All books" is chosen.
+                if (isRead(book) && showMode !== 'all') return false;
                 if (showMode === 'active' && book.active !== 1) return false;
                 if (showMode === 'archived' && book.active !== 0) return false;
                 if (showMode === 'custom' && book.source !== 'custom') return false;
                 if (showMode === 'noted' && !book.notes) return false;
-                if (!needle) return true;
-                return (book.title + ' ' + book.author + ' ' + (book.notes || '')).toLowerCase().indexOf(needle) !== -1;
+                return matchesText(book, needle);
             }).sort((a, b) => b.elo - a.elo);
+        }
+
+        /* --------------------------------------------------------- rereads */
+
+        let rereadFilterText = '';
+        let rereadOnlyIncluded = false;
+
+        function rereadCandidates() {
+            const needle = rereadFilterText.toLowerCase();
+            return books
+                .filter(isRead)
+                .filter(book => !rereadOnlyIncluded || book.active === 1)
+                .filter(book => matchesText(book, needle))
+                .sort((a, b) => a.title.localeCompare(b.title));
+        }
+
+        function rereadRow(book) {
+            const row = document.createElement('label');
+            row.className = 'reread-row';
+
+            const tick = document.createElement('input');
+            tick.type = 'checkbox';
+            tick.checked = book.active === 1;
+            tick.addEventListener('change', () => {
+                // Ticking puts it straight into the matchup pool; the ELO and
+                // matchup count it already has are left untouched.
+                setBookActive(book.id, tick.checked ? 1 : 0);
+                showStatus(tick.checked
+                    ? '"' + book.title + '" added to the ranking pool.'
+                    : '"' + book.title + '" removed from the ranking pool.', 'ok');
+                renderRereads();
+                renderLibrary();
+            });
+            row.appendChild(tick);
+
+            const text = document.createElement('span');
+            text.className = 'reread-text';
+            const title = document.createElement('span');
+            title.className = 'reread-title';
+            title.textContent = book.title;
+            text.appendChild(title);
+            const meta = document.createElement('span');
+            meta.className = 'reread-meta';
+            meta.textContent = ' ' + book.author +
+                (book.my_rating && Number(book.my_rating) > 0 ? ' | rated ' + book.my_rating : '') +
+                (book.date_read ? ' | read ' + String(book.date_read).split(' ')[0] : '');
+            text.appendChild(meta);
+            row.appendChild(text);
+
+            return row;
+        }
+
+        function renderRereads() {
+            const container = document.getElementById('reread-list');
+            const readBooks = books.filter(isRead);
+            const matches = rereadCandidates();
+            const picked = readBooks.filter(b => b.active === 1).length;
+
+            document.getElementById('reread-count').textContent = readBooks.length === 0
+                ? 'no read books imported yet'
+                : matches.length + ' of ' + readBooks.length + ' shown, ' + picked + ' picked';
+
+            container.innerHTML = '';
+            if (readBooks.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'field-hint';
+                empty.textContent = 'Upload a Goodreads or StoryGraph export to bring in your read books.';
+                container.appendChild(empty);
+                return;
+            }
+            if (!matches.length) {
+                const empty = document.createElement('p');
+                empty.className = 'field-hint';
+                empty.textContent = 'No read books match that search.';
+                container.appendChild(empty);
+                return;
+            }
+            // Long lists are capped so the page stays responsive; the search
+            // box is how you reach the rest.
+            matches.slice(0, 200).forEach(book => container.appendChild(rereadRow(book)));
+            if (matches.length > 200) {
+                const note = document.createElement('p');
+                note.className = 'field-hint';
+                note.textContent = 'Showing the first 200. Search to narrow it down.';
+                container.appendChild(note);
+            }
         }
 
         function bookRow(book) {
@@ -446,7 +601,8 @@ The Wandering Inn | pirateaba"></textarea>
             const container = document.getElementById('library');
             const matches = visibleBooks();
 
-            document.getElementById('count').textContent = matches.length + ' of ' + books.length + ' book(s)';
+            const libraryTotal = books.filter(b => !isRead(b)).length;
+            document.getElementById('count').textContent = matches.length + ' of ' + libraryTotal + ' book(s)';
 
             const usage = storageUsage();
             document.getElementById('storage-note').textContent =
@@ -567,11 +723,22 @@ The Wandering Inn | pirateaba"></textarea>
                 renderLibrary();
             });
 
+            document.getElementById('reread-filter').addEventListener('input', (e) => {
+                rereadFilterText = e.target.value.trim();
+                renderRereads();
+            });
+
+            document.getElementById('reread-only-included').addEventListener('change', (e) => {
+                rereadOnlyIncluded = e.target.checked;
+                renderRereads();
+            });
+
             document.getElementById('show-filter').addEventListener('change', (e) => {
                 showMode = e.target.value;
                 renderLibrary();
             });
 
+            renderRereads();
             renderLibrary();
         });
     </script>

@@ -175,9 +175,11 @@
         function hideInfo(bookNum) {
             infoTimers[bookNum] = setTimeout(() => {
                 const popup = document.getElementById(`book${bookNum}_info`);
-                if (popup) {
-                    popup.classList.remove('show');
-                }
+                if (!popup) return;
+                // Moving the mouse away while writing a note must not close the
+                // panel and throw the note away.
+                if (popup.contains(document.activeElement)) return;
+                popup.classList.remove('show');
             }, 200);
         }
 
@@ -199,6 +201,14 @@
                 parts.push(`<p><strong>Avg Rating:</strong> ${book.average_rating}</p>`);
             }
 
+            if (book.num_pages) {
+                parts.push(`<p><strong>Pages:</strong> ${book.num_pages}</p>`);
+            }
+
+            if (book.format && book.format.trim()) {
+                parts.push(`<p><strong>Format:</strong> ${book.format}</p>`);
+            }
+
             if (book.publisher && book.publisher.trim()) {
                 parts.push(`<p><strong>Publisher:</strong> ${book.publisher}</p>`);
             }
@@ -216,11 +226,54 @@
                 parts.push(`<p><strong>Date Added:</strong> ${dateOnly}</p>`);
             }
 
+            // StoryGraph exports carry no pages, publisher or year, so say so
+            // rather than showing an empty panel while the back-fill runs.
+            if (parts.length === 0) {
+                parts.push('<p><em>No extra details yet. Page counts are looked up in the background.</em></p>');
+            }
+
+            // Notes, editable in place. escapeHtml because this goes through
+            // innerHTML along with the rest of the panel.
+            parts.push(
+                '<label class="note-label" for="note_' + book.id + '">Your notes</label>' +
+                '<textarea class="note-box" id="note_' + book.id + '" rows="3" ' +
+                'placeholder="Why do you want to read this?" ' +
+                'oninput="markNoteDirty(\'' + book.id + '\')" ' +
+                'onblur="saveNoteFrom(this, \'' + book.id + '\')">' +
+                escapeHtml(book.notes || '') + '</textarea>' +
+                '<div class="note-status" id="note_status_' + book.id + '"></div>'
+            );
+
             // Add search link
             const searchQuery = encodeURIComponent(`${book.title} ${book.author}`);
             parts.push(`<a href="https://www.google.com/search?q=${searchQuery}" target="_blank">🔍 Search Online</a>`);
 
-            return parts.length > 1 ? '<h4>Book Info</h4>' + parts.join('') : '<h4>Book Info</h4><p><em>No additional info available</em></p>';
+            return '<h4>Book Info</h4>' + parts.join('');
+        }
+
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function markNoteDirty(bookId) {
+            const status = document.getElementById('note_status_' + bookId);
+            if (status) status.textContent = 'Unsaved';
+        }
+
+        function saveNoteFrom(textarea, bookId) {
+            const status = document.getElementById('note_status_' + bookId);
+            const saved = updateBookFields(bookId, { notes: textarea.value });
+            if (status) status.textContent = saved ? 'Saved' : 'Could not save';
+
+            // Keep the in-memory matchup in step so reopening the popup shows it.
+            if (currentMatchup) {
+                if (currentMatchup.book1 && currentMatchup.book1.id === bookId) currentMatchup.book1.notes = textarea.value.trim();
+                if (currentMatchup.book2 && currentMatchup.book2.id === bookId) currentMatchup.book2.notes = textarea.value.trim();
+            }
         }
 
         function updateProgressBar() {
@@ -434,6 +487,8 @@
 
         async function chooseWinner(winnerId, loserId) {
             if (isScoring || !currentMatchup) return;
+            // A note being edited means the reader is in the popup, not voting.
+            if (document.activeElement && document.activeElement.classList.contains('note-box')) return;
             isScoring = true;
 
             let winnerBook, loserBook;
@@ -495,6 +550,10 @@
             document.addEventListener('keydown', (e) => {
                 if (!currentMatchup || isScoring) return;
                 if (e.repeat) return;   // holding a key must not score repeatedly
+                // Arrow keys belong to the textarea while a note is being typed.
+                const editing = document.activeElement &&
+                    (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT');
+                if (editing) return;
                 const { book1, book2 } = currentMatchup;
                 if (e.key === 'ArrowLeft') {
                     chooseWinner(book1.id, book2.id);
@@ -503,6 +562,32 @@
                 } else if (e.key === 'ArrowDown') {
                     getNextMatchup();
                 }
+            });
+
+            // Page counts arrive in the background, so update the line and the
+            // popup in place rather than waiting for the next matchup.
+            window.addEventListener('bookMetadataUpdated', (e) => {
+                if (!currentMatchup || !e.detail || !e.detail.book) return;
+                const updated = e.detail.book;
+
+                [1, 2].forEach(slot => {
+                    const shown = currentMatchup['book' + slot];
+                    if (!shown || shown.id !== updated.id) return;
+
+                    currentMatchup['book' + slot] = Object.assign(shown, updated);
+                    const authorEl = document.getElementById('book' + slot + '_author');
+                    if (authorEl) {
+                        const authorText = shown.author || 'Unknown Author';
+                        authorEl.innerText = shown.num_pages > 0
+                            ? `${authorText} | ${shown.num_pages} pages`
+                            : authorText;
+                    }
+                    const popup = document.getElementById('book' + slot + '_info');
+                    // Leave it alone if a note is being written in it.
+                    if (popup && !popup.contains(document.activeElement)) {
+                        popup.innerHTML = generateInfoContent(shown);
+                    }
+                });
             });
 
             // Listen for cover updates
