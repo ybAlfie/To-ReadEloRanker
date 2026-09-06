@@ -725,23 +725,28 @@ function isImageBroken(url) {
     });
 }
 
+// Whether a book wants us to go looking for a cover.
+//
+// Both the background loop and ensureMatchupCovers ask this. They used to
+// decide separately, and the direct call had no equivalent of the loop's
+// filter, so a cover the reader supplied (an uploaded image, or a pasted
+// address) was searched for anyway, the search failed for an obscure custom
+// title, and the failure branch cleared the cover they had just added.
+function bookNeedsCover(book) {
+    if (!book || book.cover_fetch_failed) return false;
+    const url = book.cover_url;
+    if (!url) return true;                    // nothing to show yet
+    if (url.indexOf('/id/') !== -1) return false;   // already searched OpenLibrary
+    if (url.indexOf('/isbn/') !== -1) return true;  // may be a 1x1 blank, worth checking
+    return false;                             // uploaded or hand entered, leave it alone
+}
+
 async function fetchMissingCoverForBook(book) {
     if (!book || isFetchingCover) return false;
+    if (!bookNeedsCover(book)) return false;
 
-    // Check if we should fetch a better cover
-    // 1. If no cover (null/empty) -> Fetch
-    // 2. If OpenLibrary ISBN-based cover -> Check if it's broken. If broken -> Try search. If good -> Keep.
-    // 3. If OpenLibrary search-based cover (has /id/ in URL) -> Skip (already searched)
-    // 4. If marked as failed -> Skip (already tried and failed)
-    const hasNoCover = !book.cover_url;
-    const hasIsbnCover = book.cover_url && book.cover_url.includes('/isbn/');
-    const hasSearchCover = book.cover_url && book.cover_url.includes('/id/');
-    const hasFailedBefore = book.cover_fetch_failed === true;
-
-    // Skip if already has a search-based cover or marked as failed
-    if (hasSearchCover || hasFailedBefore) return false;
-
-    // Skip if has a valid ISBN-based cover
+    // An ISBN cover may be a 1x1 blank, so it is checked before replacing it.
+    const hasIsbnCover = book.cover_url && book.cover_url.indexOf('/isbn/') !== -1;
     if (hasIsbnCover) {
         const isBroken = await isImageBroken(book.cover_url);
         if (!isBroken) {
@@ -774,13 +779,18 @@ async function fetchMissingCoverForBook(book) {
             } else {
                 // Mark as failed so we don't keep retrying
                 books[bookIndex].cover_fetch_failed = true;
-                books[bookIndex].cover_url = null; // Clear the broken cover URL
+                // Only clear a cover we derived ourselves. A cover the reader
+                // uploaded or pasted is never thrown away, even if the search
+                // that should not have run comes back empty.
+                const current = books[bookIndex].cover_url;
+                const ourOwn = !current || current.indexOf('/isbn/') !== -1;
+                if (ourOwn) books[bookIndex].cover_url = null;
                 saveBooks();
                 console.log(`No valid cover found for "${book.title}", marked as failed`);
 
                 // Dispatch event so UI can show placeholder
                 window.dispatchEvent(new CustomEvent('bookCoverUpdated', {
-                    detail: { bookId: book.id, coverUrl: null, failed: true }
+                    detail: { bookId: book.id, coverUrl: books[bookIndex].cover_url, failed: true }
                 }));
             }
         }
@@ -891,13 +901,7 @@ function startBackgroundCoverFetcher() {
 
         // Find a random active book that needs a cover
         const activeBooks = books.filter(b => b.active === 1);
-        // Include books with no cover OR books with ISBN-based covers (which might be broken)
-        // Exclude books that have already been searched (have /id/ URL) or marked as failed
-        const booksNeedingCover = activeBooks.filter(b =>
-            !b.cover_fetch_failed &&
-            !b.cover_url?.includes('/id/') &&  // Already searched via OpenLibrary
-            (!b.cover_url || b.cover_url.includes('/isbn/'))  // No cover or ISBN cover that might be broken
-        );
+        const booksNeedingCover = activeBooks.filter(bookNeedsCover);
 
         if (booksNeedingCover.length > 0) {
             const randomBook = booksNeedingCover[Math.floor(Math.random() * booksNeedingCover.length)];
@@ -954,6 +958,12 @@ async function parseRankingsCSV(file, existingBooks) {
                             // must not wipe notes already written.
                             if (row["Notes"]) book.notes = row["Notes"];
                             if (row["Link"]) book.link = row["Link"];
+                            // A cover the reader uploaded lives nowhere else, so
+                            // a rankings CSV is the only way back if one is lost.
+                            if (row["Cover URL"] && !book.cover_url) {
+                                book.cover_url = row["Cover URL"];
+                                book.cover_fetch_failed = false;
+                            }
                             return;
                         }
 
@@ -1130,8 +1140,8 @@ function getNextMatchupData(options = {}) {
 
 // Helper to ensure covers are fetched for the current matchup
 async function ensureMatchupCovers(book1, book2) {
-    if (book1) await fetchMissingCoverForBook(book1);
-    if (book2) await fetchMissingCoverForBook(book2);
+    if (bookNeedsCover(book1)) await fetchMissingCoverForBook(book1);
+    if (bookNeedsCover(book2)) await fetchMissingCoverForBook(book2);
 }
 
 // Fetch cover from OpenLibrary using their Search API
