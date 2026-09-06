@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About This Website</title>
+    <title>To-Read ELO Ranker - About</title>
     <link rel="stylesheet" href="css/styles.css">
     <style>
         body {
@@ -45,6 +45,7 @@
             Using a series of one-on-one matchups, you compare two books at a time, choosing the one you’d rather read.
             The website uses an ELO rating system (similar to Chess) to rank all your books, helping you decide what to
             read without having to compare each book individually.
+            It works with a library export from either Goodreads or StoryGraph.
         </p>
     </section>
 
@@ -52,11 +53,15 @@
         <h2>How to Use the Website</h2>
         <ol>
             <li><strong>Start at the Upload Page:</strong> On the <a href="index.html">Upload</a> page,
-                you can upload your Goodreads Library Export CSV (or a previous rankings CSV if you have one).
-                This will import your "Want to Read" list.
+                you can upload your Goodreads or StoryGraph Library Export CSV (or a previous rankings CSV if you
+                have one). This will import your "Want to Read" list. Both go in the same box, the format is detected
+                automatically.
                 <ul>
                     <li><a href="https://www.goodreads.com/review/import">Click here</a> to export your library from
                         Goodreads or go to "My Books", then click on "Import and export" under Tools.</li>
+                    <li><a href="https://app.thestorygraph.com/user-export">Click here</a> to export your library from
+                        StoryGraph or go to your profile, then click on "Manage Account" and scroll down to "Export
+                        StoryGraph Library".</li>
                 </ul>
             </li>
             <li><strong>Go to the Ranking Page:</strong> After uploading, go to the <a href="ranking.html">Rank
@@ -70,17 +75,17 @@
             <li><strong>View the Leaderboard:</strong> When you’ve made enough comparisons, visit the <a
                     href="leaderboard.html">Leaderboard</a>
                 to see how your books stack up. You can also export your current rankings for future sessions.</li>
-            <li><strong>Merge Updated Files:</strong> If you’ve made changes to your Goodreads "Want to Read" list since
-                your last session you can
-                upload both the new Goodreads Library Export and your old rankings CSV together on the Upload page.
-                The system will automatically update by adding new books, removing titles no longer in your want to read
-                list, and preserving your previous ELO rankings.</li>
+            <li><strong>Merge Updated Files:</strong> If you’ve made changes to your Goodreads or StoryGraph "Want to
+                Read" list since your last session you can
+                upload both the new Library Export and your old rankings CSV together on the Upload page.
+                The system will automatically update by adding new books, archiving titles no longer in your want to read
+                list (they keep their ELO score, they just stop appearing in matchups), and preserving your previous ELO
+                rankings. Importing one library never archives books from the other.</li>
         </ol>
     </section>
 
     <section>
         <h2>FAQ</h2>
-        <p>
         <section id="faq-storage-privacy">
             <h3>Data Storage and Privacy:</h3>
             <p>
@@ -112,7 +117,6 @@
                 </li>
             </ul>
         </section>
-        </p>
     </section>
 </body>
 

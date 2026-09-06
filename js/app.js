@@ -170,6 +170,7 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
                                 year_published: row["Year Published"] || existingBook.year_published,
                                 original_publication_year: row["Original Publication Year"] || existingBook.original_publication_year,
                                 date_added: row["Date Added"] || existingBook.date_added,
+                                source: existingBook.source || 'goodreads',
                                 active: 1
                             });
                         } else {
@@ -192,6 +193,7 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
                                 date_added: row["Date Added"] || '',
                                 elo: 1500,
                                 matchups: 0,
+                                source: 'goodreads',
                                 active: 1
                             });
                         }
@@ -204,17 +206,12 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
                         wantToReadBooks.map(book => [createBookKey(book), book])
                     );
 
-                    // Mark existing books as inactive if not in new import
+                    // Books missing from this import are archived, but only if
+                    // they came from this library. A Goodreads import must not
+                    // archive your StoryGraph books or the ones you added by hand.
                     const inactiveBooks = existingBooks
-                        .filter(book => {
-                            const key = createBookKey(book);
-                            const isInNewBooks = newBooksMap.has(key);
-                            if (!isInNewBooks) {
-                                console.log(`Marking as inactive: "${book.title}" by ${book.author}, Key: ${key}`);
-                            }
-                            return !isInNewBooks;
-                        })
-                        .map(book => ({ ...book, active: 0 }));
+                        .filter(book => !newBooksMap.has(createBookKey(book)))
+                        .map(book => archiveIfOwnedBy(book, 'goodreads'));
 
                     const mergedBooks = [...wantToReadBooks, ...inactiveBooks];
                     console.log('Final merged book count:', mergedBooks.length);
@@ -231,6 +228,160 @@ async function parseGoodreadsCSV(file, existingBooks, progressCallback) {
             }
         });
     });
+}
+
+// Records that predate source tracking came from Goodreads, the only
+// importer that existed at the time.
+function bookSource(book) {
+    return book.source || 'goodreads';
+}
+
+function archiveIfOwnedBy(book, source) {
+    if (bookSource(book) !== source) return book;   // another library owns it
+    console.log(`Marking as inactive: "${book.title}" by ${book.author}`);
+    return { ...book, active: 0 };
+}
+
+// cleanISBN only strips characters, so a StoryGraph UUID would survive it as a
+// long meaningless digit string and then get used as a book key. This insists
+// on something ISBN shaped.
+function normaliseIsbn(raw) {
+    const cleaned = cleanISBN(raw);
+    if (!cleaned) return null;
+    return /^\d{9}[\dX]$|^\d{13}$/.test(cleaned) ? cleaned : null;
+}
+
+// Read just the header row, so the upload page can accept either library
+// through a single file input.
+function detectCsvType(file) {
+    return new Promise((resolve, reject) => {
+        Papa.parse(file, {
+            header: true,
+            preview: 1,
+            skipEmptyLines: true,
+            complete: function (results) {
+                const headers = (results.meta && results.meta.fields) ||
+                                (results.data[0] ? Object.keys(results.data[0]) : []);
+                const has = name => headers.indexOf(name) !== -1;
+
+                if (has('Read Status') || has('ISBN/UID')) return resolve('storygraph');
+                if (has('Exclusive Shelf') || has('Bookshelves') || has('Book Id')) return resolve('goodreads');
+                if (has('ELO') || has('Elo')) return resolve('rankings');
+                resolve('unknown');
+            },
+            error: function (error) { reject(error); }
+        });
+    });
+}
+
+// Parse StoryGraph CSV
+//
+// One row per book, with the shelf in "Read Status" rather than a shelf column.
+// "ISBN/UID" holds an ISBN for most books and an internal UUID for the rest.
+async function parseStorygraphCSV(file, existingBooks, progressCallback) {
+    return new Promise((resolve, reject) => {
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function (results) {
+                try {
+                    console.log('Parsing StoryGraph CSV with', results.data.length, 'rows');
+                    if (results.errors && results.errors.length > 0) {
+                        console.warn('CSV Parsing Errors:', results.errors);
+                    }
+
+                    const existingBooksMap = new Map();
+                    existingBooks.forEach(book => {
+                        existingBooksMap.set(createBookKey(book), book);
+                    });
+
+                    const rowsToProcess = results.data.filter(row =>
+                        String(row['Read Status'] || '').trim().toLowerCase() === 'to-read' &&
+                        String(row['Title'] || '').trim() !== ''
+                    );
+
+                    if (progressCallback) progressCallback(`Found ${rowsToProcess.length} books to process...`);
+
+                    const wantToReadBooks = rowsToProcess.map(row => {
+                        const isbn = normaliseIsbn(row['ISBN/UID']);
+                        const title = row['Title'] || 'Unknown Title';
+                        const author = row['Authors'] || row['Contributors'] || 'Unknown Author';
+                        const existingBook = existingBooksMap.get(createBookKey({ isbn, title, author }));
+
+                        if (existingBook) {
+                            return {
+                                ...existingBook,
+                                title: title,
+                                author: author,
+                                isbn: isbn || existingBook.isbn,
+                                cover_url: existingBook.cover_url ||
+                                    (isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg` : null),
+                                date_added: row['Date Added'] || existingBook.date_added,
+                                source: existingBook.source || 'storygraph',
+                                active: 1
+                            };
+                        }
+
+                        return {
+                            id: generateUniqueId(),
+                            isbn: isbn,
+                            title: title,
+                            author: author,
+                            cover_url: isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg` : null,
+                            num_pages: null,
+                            additional_authors: row['Contributors'] || '',
+                            average_rating: '',
+                            publisher: '',
+                            year_published: '',
+                            original_publication_year: '',
+                            date_added: row['Date Added'] || '',
+                            elo: 1500,
+                            matchups: 0,
+                            source: 'storygraph',
+                            active: 1
+                        };
+                    });
+
+                    console.log('Found', wantToReadBooks.length, 'want to read books');
+
+                    const newBooksMap = new Map(
+                        wantToReadBooks.map(book => [createBookKey(book), book])
+                    );
+
+                    const inactiveBooks = existingBooks
+                        .filter(book => !newBooksMap.has(createBookKey(book)))
+                        .map(book => archiveIfOwnedBy(book, 'storygraph'));
+
+                    const mergedBooks = [...wantToReadBooks, ...inactiveBooks];
+                    console.log('Final merged book count:', mergedBooks.length);
+                    resolve(mergedBooks);
+                } catch (error) {
+                    console.error('Error processing StoryGraph data:', error);
+                    reject(error);
+                }
+            },
+            error: function (error) {
+                console.error('CSV parsing error:', error);
+                reject(error);
+            }
+        });
+    });
+}
+
+// Read a library export of either flavour, detecting which it is.
+async function parseLibraryCSV(file, existingBooks, progressCallback) {
+    const kind = await detectCsvType(file);
+
+    if (kind === 'goodreads') {
+        return { kind, books: await parseGoodreadsCSV(file, existingBooks, progressCallback) };
+    }
+    if (kind === 'storygraph') {
+        return { kind, books: await parseStorygraphCSV(file, existingBooks, progressCallback) };
+    }
+    if (kind === 'rankings') {
+        throw new Error('That looks like a rankings CSV. Please choose it in the "Previous Rankings CSV" box instead.');
+    }
+    throw new Error('Unrecognised CSV. Expected a Goodreads or StoryGraph library export.');
 }
 
 // Background Cover Fetcher

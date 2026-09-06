@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Goodreads ELO Ranker - Upload</title>
+    <title>To-Read ELO Ranker - Upload</title>
     <link rel="stylesheet" href="css/styles.css">
     <!-- PapaParse from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
@@ -19,12 +19,15 @@
         <a href="leaderboard.html">Leaderboard</a> |
         <a href="about.html">About</a>
     </nav>
-    <h1>Goodreads ELO Ranker &#128218;</h1>
+    <h1>To-Read ELO Ranker &#128218;</h1>
     <h3 style="text-align:center; color:#664b33"><i>Pair books in one-on-one matchups and discover which titles rise to
             the top of your want to read pile.</i></h3>
     <form id="upload-form">
-        <p><strong>Goodreads Library Export:</strong></p>
-        <input type="file" id="goodreads-file" accept=".csv">
+        <p><strong>Library Export:</strong></p>
+        <input type="file" id="library-file" accept=".csv">
+        <p style="margin:2px 0 0 0; color:#664b33; font-size:0.9em;">
+            Goodreads or StoryGraph. The format is detected automatically.
+        </p>
         <p><strong>Previous Rankings CSV:</strong></p>
         <input type="file" id="rankings-file" accept=".csv">
         <br><br>
@@ -39,9 +42,9 @@
         </button>
     </div>
 
-    <p style="margin-top:20px;">Upload your Goodreads Library Export to get started or a Previous Rankings CSV to
-        continue where you left off. <br> If you've made changes to your Goodreads library, you can upload both files to
-        merge changes.</p>
+    <p style="margin-top:20px;">Upload your Goodreads or StoryGraph Library Export to get started or a Previous
+        Rankings CSV to continue where you left off. <br> If you've made changes to your library, you can upload both
+        files to merge changes.</p>
 
     <div class="instructions">
         <a href="about.html">Click here to check the about page and read the how to guide.</a>
@@ -50,10 +53,10 @@
     <script>
         // Add clear storage functionality
         document.getElementById('clear-storage').addEventListener('click', function () {
-            if (confirm('Are you sure you want to clear all Goodreads ELO Ranker data? This will remove all your rankings and cannot be undone.')) {
+            if (confirm('Are you sure you want to clear all To-Read ELO Ranker data? This will remove all your rankings and cannot be undone.')) {
                 // Only remove our specific data
                 if (removeStoredValue('books')) {
-                    alert('All Goodreads ELO Ranker data has been cleared. You can now start fresh!');
+                    alert('All To-Read ELO Ranker data has been cleared. You can now start fresh!');
                 } else {
                     alert('Could not clear your data because browser storage is unavailable.');
                 }
@@ -63,12 +66,12 @@
         document.getElementById('upload-form').addEventListener('submit', async function (e) {
             e.preventDefault();
 
-            const goodreadsFile = document.getElementById('goodreads-file').files[0];
+            const libraryFile = document.getElementById('library-file').files[0];
             const rankingsFile = document.getElementById('rankings-file').files[0];
             const statusDiv = document.getElementById('status-message');
             const uploadBtn = document.querySelector('button[type="submit"]');
 
-            if (!goodreadsFile && !rankingsFile) {
+            if (!libraryFile && !rankingsFile) {
                 alert("Please select at least one file to upload.");
                 return;
             }
@@ -81,6 +84,7 @@
 
             // Get existing books from localStorage
             let loadedBooks = loadStoredBooks();
+            let libraryName = '';
 
             try {
                 // Process files in the correct order:
@@ -89,13 +93,14 @@
                 // This ensures that when both files are uploaded simultaneously,
                 // the rankings can match against the books from the Goodreads file.
 
-                if (goodreadsFile) {
-                    statusDiv.textContent = "Processing Goodreads CSV...";
-                    console.log('Processing Goodreads CSV...');
-                    // This will merge with any existing books and set active status
-                    loadedBooks = await parseGoodreadsCSV(goodreadsFile, loadedBooks, (msg) => {
+                if (libraryFile) {
+                    statusDiv.textContent = "Reading library export...";
+                    // Detects Goodreads vs StoryGraph from the headers.
+                    const result = await parseLibraryCSV(libraryFile, loadedBooks, (msg) => {
                         statusDiv.textContent = msg;
                     });
+                    loadedBooks = result.books;
+                    libraryName = result.kind === 'storygraph' ? 'StoryGraph' : 'Goodreads';
                 }
 
                 if (rankingsFile) {
@@ -113,7 +118,9 @@
                     uploadBtn.textContent = "Upload &/or Merge";
                     return;
                 }
-                statusDiv.textContent = "Upload complete! Redirecting...";
+                const activeCount = loadedBooks.filter(b => b.active === 1).length;
+                statusDiv.textContent = (libraryName ? "Read your " + libraryName + " export. " : "") +
+                    activeCount + " books ready to rank. Redirecting...";
                 statusDiv.style.color = "green";
                 setTimeout(() => {
                     window.location.href = 'ranking.html';
