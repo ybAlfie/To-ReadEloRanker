@@ -1,15 +1,121 @@
+/* To-Read ELO Ranker
+   Every colour in the site is a token, so the dark theme is a swap of this
+   one block. Light is the default; js/theme.js stamps data-theme="dark" on
+   <html> before first paint. */
+
+:root {
+    --bg: #f1e9d6;
+    --text: #2b2118;
+    --heading: #4e3927;
+    --muted: #664b33;
+    --muted-soft: #666666;
+    --link: #4e3927;
+    --surface: #ebddc3;
+    --border: #cccccc;
+
+    --accent: #567749;
+    --accent-hover: #3d6d3d;
+    --accent-2: #6a9156;
+    --accent-text: #ffffff;
+
+    --btn-alt: #8b7150;
+    --btn-alt-hover: #74614b;
+
+    --highlight: #9fc48f;
+    --track: #e0d8c8;
+
+    --popup-bg: #ffffff;
+    --popup-border: #c0b090;
+    --popup-rule: #eeeeee;
+    --popup-text: #333333;
+    --popup-link-bg: #f4f1ea;
+    --popup-link-bg-hover: #e9e4d8;
+    --info-btn-bg: rgba(255, 255, 255, 0.9);
+    --info-btn-bg-hover: #ffffff;
+
+    --download: #4CAF50;
+    --danger: #ff4444;
+    --danger-text: #ffffff;
+
+    --status-neutral: #333333;
+    --status-ok: #1c7a1c;
+    --status-error: #b32020;
+
+    --switch-knob: #ffffff;
+    --switch-off: #cccccc;
+}
+
+[data-theme="dark"] {
+    --bg: #211a14;
+    --text: #ece2d0;
+    --heading: #e6d2ae;
+    --muted: #c3a883;
+    --muted-soft: #a5937b;
+    --link: #e6d2ae;
+    --surface: #362b21;
+    --border: #4b3d2e;
+
+    --accent: #6b9c5c;
+    --accent-hover: #7cb06b;
+    --accent-2: #8ab878;
+    --accent-text: #10160e;
+
+    --btn-alt: #7a6349;
+    --btn-alt-hover: #90775a;
+
+    --highlight: #46703a;
+    --track: #3a2e23;
+
+    --popup-bg: #2c231b;
+    --popup-border: #5a4835;
+    --popup-rule: #4b3d2e;
+    --popup-text: #ece2d0;
+    --popup-link-bg: #362b21;
+    --popup-link-bg-hover: #43362a;
+    --info-btn-bg: rgba(54, 43, 33, 0.92);
+    --info-btn-bg-hover: #43362a;
+
+    --download: #4f8f4a;
+    --danger: #c4544f;
+    --danger-text: #f7eeee;
+
+    --status-neutral: #ece2d0;
+    --status-ok: #7cc47c;
+    --status-error: #e08b8b;
+
+    --switch-knob: #ece2d0;
+    --switch-off: #5a4835;
+}
+
+/* Native controls, scrollbars and form widgets follow the theme too. */
+:root {
+    color-scheme: light;
+}
+
+[data-theme="dark"] {
+    color-scheme: dark;
+}
+
 body {
     font-family: Georgia, serif;
     max-width: 1000px;
     margin: 20px auto;
     padding: 0 20px;
     line-height: 1.5;
-    background-color: #f1e9d6;
+    background-color: var(--bg);
+    color: var(--text);
 }
 
-h1, h2 {
+h1,
+h2 {
     text-align: center;
-    color: #4e3927;
+    color: var(--heading);
+}
+
+/* Was an inline style on the tagline of the upload and ranking pages. */
+.page-subtitle {
+    text-align: center;
+    color: var(--muted);
 }
 
 button {
@@ -28,9 +134,82 @@ nav {
 nav a {
     margin: 0 10px;
     text-decoration: none;
-    color: #4e3927;
+    color: var(--link);
 }
 
 nav a:hover {
     text-decoration: underline;
+}
+
+.theme-toggle {
+    margin-left: 12px;
+    padding: 4px 12px;
+    font-family: inherit;
+    font-size: 0.85em;
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.theme-toggle:hover {
+    background-color: var(--track);
+}
+
+/* ------------------------------------------------------------ upload page */
+
+.field-hint {
+    margin: 2px 0 0 0;
+    color: var(--muted);
+    font-size: 0.9em;
+}
+
+#status-message {
+    margin-top: 15px;
+    font-weight: bold;
+    min-height: 24px;
+    color: var(--status-neutral);
+}
+
+#status-message.is-ok {
+    color: var(--status-ok);
+}
+
+#status-message.is-error {
+    color: var(--status-error);
+}
+
+.btn-danger {
+    background-color: var(--danger);
+    color: var(--danger-text);
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+}
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 760px) {
+    body {
+        margin: 12px auto;
+        padding: 0 14px;
+    }
+
+    h1 {
+        font-size: 1.6em;
+    }
+
+    nav {
+        padding: 6px 0;
+    }
+
+    nav a {
+        display: inline-block;
+        margin: 4px 6px;
+    }
+
+    .theme-toggle {
+        margin-left: 6px;
+    }
 }

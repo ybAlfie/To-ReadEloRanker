@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>To-Read ELO Ranker - Leaderboard</title>
     <link rel="stylesheet" href="css/styles.css">
+    <!-- Applies the saved theme before first paint, so there is no flash -->
+    <script src="js/theme.js"></script>
     <link rel="stylesheet" href="css/ranking-controls.css">
     <style>
         table {
@@ -16,13 +18,13 @@
 
         th,
         td {
-            border: 1px solid #ccc;
+            border: 1px solid var(--border);
             padding: 10px;
             text-align: center;
         }
 
         th {
-            background-color: #ebddc3;
+            background-color: var(--surface);
         }
 
         img {
@@ -35,8 +37,8 @@
             width: 200px;
             margin: 20px auto;
             padding: 10px;
-            background-color: #4CAF50;
-            color: white;
+            background-color: var(--download);
+            color: var(--accent-text);
             text-align: center;
             text-decoration: none;
             border-radius: 5px;
@@ -54,7 +56,7 @@
         }
 
         tbody tr:hover {
-            background-color: #9fc48f;
+            background-color: var(--highlight);
         }
 
         /* Info popup - attached to body, not to row */
@@ -66,10 +68,38 @@
         /* Hint text styling */
         .hover-hint {
             text-align: center;
-            color: #666;
+            color: var(--muted-soft);
             font-size: 14px;
             margin-top: 10px;
             margin-bottom: 15px;
+        }
+
+        /* Keeps a wide table from pushing the whole page sideways. */
+        .table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 760px) {
+            table {
+                width: 100%;
+                min-width: 460px;
+            }
+
+            th,
+            td {
+                padding: 6px 5px;
+                font-size: 0.9em;
+            }
+
+            img {
+                max-width: 38px;
+            }
+
+            .download-button {
+                width: auto;
+                max-width: 320px;
+            }
         }
     </style>
     <!-- PapaParse for CSV generation -->
@@ -364,6 +394,7 @@
         <a href="ranking.html">Rank Books</a> |
         <a href="leaderboard.html">Leaderboard</a> |
         <a href="about.html">About</a>
+        <button type="button" class="theme-toggle">☾ Dark</button>
     </nav>
 
     <div id="main-content">
@@ -371,7 +402,8 @@
             <h1>Book Rankings Leaderboard</h1>
             <a href="#" id="download-btn" class="download-button">Download Rankings CSV</a>
             <div class="hover-hint">Hover or click a book for additional information.</div>
-            <table>
+            <div class="table-scroll">
+                <table>
                 <thead>
                     <tr>
                         <th>Rank</th>
@@ -384,7 +416,8 @@
                     </tr>
                 </thead>
                 <tbody id="leaderboard-body"></tbody>
-            </table>
+                </table>
+            </div>
             <div class="instructions">
                 <a href="ranking.html">Back to Rank Books</a>
             </div>

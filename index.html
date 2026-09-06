@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>To-Read ELO Ranker - Upload</title>
     <link rel="stylesheet" href="css/styles.css">
+    <!-- Applies the saved theme before first paint, so there is no flash -->
+    <script src="js/theme.js"></script>
     <!-- PapaParse from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="js/elo.js"></script>
@@ -18,14 +20,15 @@
         <a href="ranking.html">Rank Books</a> |
         <a href="leaderboard.html">Leaderboard</a> |
         <a href="about.html">About</a>
+        <button type="button" class="theme-toggle">☾ Dark</button>
     </nav>
     <h1>To-Read ELO Ranker &#128218;</h1>
-    <h3 style="text-align:center; color:#664b33"><i>Pair books in one-on-one matchups and discover which titles rise to
+    <h3 class="page-subtitle"><i>Pair books in one-on-one matchups and discover which titles rise to
             the top of your want to read pile.</i></h3>
     <form id="upload-form">
         <p><strong>Library Export:</strong></p>
         <input type="file" id="library-file" accept=".csv">
-        <p style="margin:2px 0 0 0; color:#664b33; font-size:0.9em;">
+        <p class="field-hint">
             Goodreads or StoryGraph. The format is detected automatically.
         </p>
         <p><strong>Previous Rankings CSV:</strong></p>
@@ -34,10 +37,10 @@
         <button type="submit" id="upload-btn">Upload &/or Merge</button>
     </form>
 
-    <div id="status-message" style="margin-top: 15px; font-weight: bold; color: #333; min-height: 24px;"></div>
+    <div id="status-message"></div>
 
     <div style="text-align: center; margin-top: 20px;">
-        <button id="clear-storage" style="background-color: #ff4444; color: white; padding: 8px 16px;">
+        <button id="clear-storage" class="btn-danger">
             Clear All Data
         </button>
     </div>
@@ -80,7 +83,7 @@
             uploadBtn.disabled = true;
             uploadBtn.textContent = "Processing...";
             statusDiv.textContent = "Starting upload...";
-            statusDiv.style.color = "#333";
+            statusDiv.className = '';
 
             // Get existing books from localStorage
             let loadedBooks = loadStoredBooks();
@@ -113,7 +116,7 @@
                 // Save final merged books to localStorage
                 if (!writeStoredJSON('books', loadedBooks)) {
                     statusDiv.textContent = "Could not save: browser storage is full or blocked.";
-                    statusDiv.style.color = "red";
+                    statusDiv.className = 'is-error';
                     uploadBtn.disabled = false;
                     uploadBtn.textContent = "Upload &/or Merge";
                     return;
@@ -121,14 +124,14 @@
                 const activeCount = loadedBooks.filter(b => b.active === 1).length;
                 statusDiv.textContent = (libraryName ? "Read your " + libraryName + " export. " : "") +
                     activeCount + " books ready to rank. Redirecting...";
-                statusDiv.style.color = "green";
+                statusDiv.className = 'is-ok';
                 setTimeout(() => {
                     window.location.href = 'ranking.html';
                 }, 1000);
             } catch (error) {
                 console.error(error);
                 statusDiv.textContent = "Error: " + error.message;
-                statusDiv.style.color = "red";
+                statusDiv.className = 'is-error';
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = "Upload &/or Merge";
                 alert("Error processing files: " + error.message);

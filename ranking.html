@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>To-Read ELO Ranker - Rank Books</title>
     <link rel="stylesheet" href="css/styles.css">
+    <!-- Applies the saved theme before first paint, so there is no flash -->
+    <script src="js/theme.js"></script>
     <link rel="stylesheet" href="css/ranking-controls.css">
     <script src="js/elo.js"></script>
     <script src="js/app.js" defer></script>
@@ -58,11 +60,11 @@
         }
 
         .book-container:hover {
-            background-color: #9fc48f;
+            background-color: var(--highlight);
         }
 
         .chosen {
-            background-color: #9fc48f !important;
+            background-color: var(--highlight) !important;
         }
 
         .matchup-container {
@@ -76,6 +78,85 @@
         .instructions {
             text-align: center;
             margin-top: 10px;
+        }
+
+        /* Only one of these shows, depending on whether the device has a
+           pointer that can hover (a mouse) or not (a touchscreen). */
+        .touch-hint {
+            display: none;
+        }
+
+        @media (hover: none) {
+            .keyboard-hint .kbd-hint {
+                display: none;
+            }
+
+            .keyboard-hint .touch-hint {
+                display: inline;
+            }
+        }
+
+        @media (max-width: 760px) {
+            /* Two 250px cards will not fit side by side on a phone, so they
+               stack and the win buttons below become the primary control. */
+            .matchup-container {
+                flex-direction: column;
+                align-items: center;
+                padding: 10px 0;
+            }
+
+            .book-container {
+                display: block;
+                width: 100%;
+                max-width: 340px;
+                margin: 0 0 14px 0;
+            }
+
+            .image-wrapper {
+                height: 220px;
+            }
+
+            /* The desktop rule pins height and lets width run free, which
+               overflows a narrow screen. */
+            .image-wrapper img {
+                height: auto;
+                width: auto;
+                max-height: 100%;
+                max-width: 100%;
+            }
+
+            .controls-container {
+                flex-wrap: wrap;
+                gap: 8px;
+                margin: 16px auto 12px;
+            }
+
+            .controls-container button {
+                min-width: 0;
+                flex: 1 1 28%;
+                padding: 12px 6px;
+                font-size: 15px;
+            }
+
+            .info-popup {
+                width: auto;
+                left: 10px;
+                right: 10px;
+            }
+
+            .limit-controls {
+                font-size: 0.95em;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .image-wrapper {
+                height: 170px;
+            }
+
+            .title-stats-container h3 {
+                font-size: 1.05em;
+            }
         }
     </style>
     <script>
@@ -169,7 +250,7 @@
             }
 
             if (progressText) {
-                progressText.innerHTML = `${booksWithEnoughMatchups}/${activeBooks.length} books with at least <select id="target-matchups-select" onchange="updateTargetMatchups()" style="padding: 2px 4px; border: 1px solid #ccc; border-radius: 3px; font-size: 13px; margin: 0 2px; cursor: pointer;">
+                progressText.innerHTML = `${booksWithEnoughMatchups}/${activeBooks.length} books with at least <select id="target-matchups-select" onchange="updateTargetMatchups()" style="padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px; font-size: 13px; margin: 0 2px; cursor: pointer;">
                     <option value="1">1</option>
                     <option value="5">5</option>
                     <option value="10">10</option>
@@ -450,11 +531,12 @@
         <a href="ranking.html">Rank Books</a> |
         <a href="leaderboard.html">Leaderboard</a> |
         <a href="about.html">About</a>
+        <button type="button" class="theme-toggle">☾ Dark</button>
     </nav>
 
     <div id="main-content">
         <h1 style="text-align:center;">Compare Books</h1>
-        <h3 style="text-align:center; color:#664b33"><i>Which book would you prefer to read?</i></h3>
+        <h3 class="page-subtitle"><i>Which book would you prefer to read?</i></h3>
         <div class="matchup-container">
             <div id="book1_container" class="book-container"
                 onclick="if(currentMatchup) chooseWinner(currentMatchup.book1.id, currentMatchup.book2.id)">
@@ -507,7 +589,8 @@
                 &rarr;</button>
         </div>
         <div class="keyboard-hint">
-            Keyboard: &larr; Left wins | &rarr; Right wins | &darr; Skip
+            <span class="kbd-hint">Keyboard: &larr; Left wins | &rarr; Right wins | &darr; Skip</span>
+            <span class="touch-hint">Tap a book, or use the buttons above.</span>
         </div>
 
         <div class="instructions">
