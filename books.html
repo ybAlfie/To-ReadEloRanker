@@ -19,9 +19,54 @@
             margin-bottom: 24px;
         }
 
+        .panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
         .panel h2 {
             margin-top: 0;
             font-size: 1.2em;
+            text-align: left;
+        }
+
+        .panel-toggle {
+            flex: none;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            line-height: 1;
+            font-size: 0.9em;
+            color: var(--muted);
+            background-color: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .panel-toggle:hover {
+            background-color: var(--bg);
+        }
+
+        /* Points down when open, right when closed. */
+        .panel-toggle span {
+            display: inline-block;
+            transition: transform 0.15s ease;
+        }
+
+        .panel-toggle[aria-expanded="false"] span {
+            transform: rotate(-90deg);
+        }
+
+        .panel-body[hidden] {
+            display: none;
+        }
+
+        .storage-note {
+            margin: -12px 0 24px 0;
+            text-align: center;
         }
 
         .stack-form label {
@@ -262,12 +307,17 @@
     </nav>
 
     <h1>My Books</h1>
-    <h3 class="page-subtitle"><i>Add books by hand, write notes, and archive anything you have gone off.</i></h3>
 
     <div id="status-message"></div>
 
     <section class="panel">
-        <h2>Add a Book</h2>
+        <div class="panel-head">
+            <h2>Add a Book</h2>
+            <button type="button" class="panel-toggle" aria-controls="panel-add" aria-expanded="true">
+                <span aria-hidden="true">&#9662;</span>
+            </button>
+        </div>
+        <div class="panel-body" id="panel-add">
         <form id="add-form" class="stack-form">
             <label>Title <span class="inline-hint">required</span>
                 <input type="text" id="add-title" required>
@@ -295,13 +345,24 @@
                 <button type="submit" class="primary" id="add-btn">Add Book</button>
             </div>
         </form>
+        </div>
     </section>
 
+    <p id="storage-note" class="field-hint storage-note"></p>
+
     <section class="panel">
-        <h2>Add Many at Once</h2>
+        <div class="panel-head">
+            <h2>Add Multiple</h2>
+            <button type="button" class="panel-toggle" aria-controls="panel-bulk" aria-expanded="true">
+                <span aria-hidden="true">&#9662;</span>
+            </button>
+        </div>
+        <div class="panel-body" id="panel-bulk">
         <p class="field-hint">
-            One book per line, as <code>Title | Author | Cover image URL</code>. Only the title is needed. Tabs work as
-            separators too, so a spreadsheet column can be pasted straight in. Lines starting with # are ignored.
+            One book per line, as <code>Title | Author | Cover image URL | Pages</code>. Only the title is needed, and
+            the fields after it can be in any order: a plain number is read as the page count, an image address as the
+            cover, any other address as a link. Tabs work as separators too, so a spreadsheet column can be pasted
+            straight in. Lines starting with # are ignored.
         </p>
         <details>
             <summary>Royal Road and other web fiction</summary>
@@ -314,21 +375,28 @@
             </p>
         </details>
         <textarea id="bulk-input" rows="8"
-            placeholder="Mother of Learning | nobody103 | https://example.com/cover.jpg
+            placeholder="Mother of Learning | nobody103 | https://example.com/cover.jpg | 828
 https://www.royalroad.com/fiction/21220/mother-of-learning
-The Wandering Inn | pirateaba"></textarea>
+The Wandering Inn | pirateaba | 612"></textarea>
         <div class="button-row">
             <button type="button" class="primary" id="bulk-btn">Add These Books</button>
             <button type="button" id="bulk-preview-btn">Preview</button>
         </div>
         <div id="bulk-preview" class="bulk-preview" hidden></div>
+        </div>
     </section>
 
     <section class="panel">
-        <h2>Books You Have Read</h2>
+        <div class="panel-head">
+            <h2>Books You Have Read</h2>
+            <button type="button" class="panel-toggle" aria-controls="panel-reread" aria-expanded="true">
+                <span aria-hidden="true">&#9662;</span>
+            </button>
+        </div>
+        <div class="panel-body" id="panel-reread">
         <p class="field-hint">
             Your read shelf is imported alongside your want to read list, but kept out of matchups. Search it here and
-            tick anything you would happily read again to add it to the ranking pool.
+            tick anything you want to reread to add it to the ranking pool.
         </p>
         <div class="library-controls">
             <input type="text" id="reread-filter" placeholder="Search your read books">
@@ -338,10 +406,17 @@ The Wandering Inn | pirateaba"></textarea>
             <span id="reread-count" class="count-label"></span>
         </div>
         <div id="reread-list"></div>
+        </div>
     </section>
 
     <section class="panel">
-        <h2>Your Library</h2>
+        <div class="panel-head">
+            <h2>Your Library</h2>
+            <button type="button" class="panel-toggle" aria-controls="panel-library" aria-expanded="true">
+                <span aria-hidden="true">&#9662;</span>
+            </button>
+        </div>
+        <div class="panel-body" id="panel-library">
         <div class="library-controls">
             <input type="text" id="filter" placeholder="Search title, author or notes">
             <select id="show-filter">
@@ -355,7 +430,7 @@ The Wandering Inn | pirateaba"></textarea>
             <span id="count" class="count-label"></span>
         </div>
         <div id="library"></div>
-        <p id="storage-note" class="field-hint"></p>
+        </div>
     </section>
 
     <script>
@@ -624,7 +699,36 @@ The Wandering Inn | pirateaba"></textarea>
 
         /* ------------------------------------------------------------ wiring */
 
+        const PANEL_STATE_KEY = 'booksPanelState';
+
+        function setupPanels() {
+            const state = readStoredJSON(PANEL_STATE_KEY, {});
+
+            document.querySelectorAll('.panel-toggle').forEach(button => {
+                const bodyId = button.getAttribute('aria-controls');
+                const body = document.getElementById(bodyId);
+                if (!body) return;
+
+                const open = state[bodyId] !== false;
+                button.setAttribute('aria-expanded', open ? 'true' : 'false');
+                button.setAttribute('aria-label', (open ? 'Collapse ' : 'Expand ') + bodyId);
+                body.hidden = !open;
+
+                button.addEventListener('click', () => {
+                    const nowOpen = button.getAttribute('aria-expanded') !== 'true';
+                    button.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+                    button.setAttribute('aria-label', (nowOpen ? 'Collapse ' : 'Expand ') + bodyId);
+                    body.hidden = !nowOpen;
+
+                    const current = readStoredJSON(PANEL_STATE_KEY, {});
+                    current[bodyId] = nowOpen;
+                    writeStoredJSON(PANEL_STATE_KEY, current);
+                });
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
+            setupPanels();
             document.getElementById('add-cover-file').addEventListener('change', async (e) => {
                 const file = e.target.files[0];
                 const preview = document.getElementById('add-preview');
@@ -685,6 +789,7 @@ The Wandering Inn | pirateaba"></textarea>
                     const item = document.createElement('li');
                     item.textContent = entry.title +
                         (entry.author ? ' by ' + entry.author : ' (no author)') +
+                        (entry.num_pages ? ' | ' + entry.num_pages + ' pages' : '') +
                         (entry.cover_url ? ' [cover]' : '') +
                         (entry.link ? ' [link]' : '');
                     list.appendChild(item);

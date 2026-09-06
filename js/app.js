@@ -610,8 +610,11 @@ function titleFromUrl(url) {
 // One book per line:
 //   Title
 //   Title | Author
-//   Title | Author | Cover image URL
+//   Title | Author | Cover image URL | Pages
 //   https://www.royalroad.com/fiction/12345/some-story
+// The fields after the title are identified by shape rather than position: a
+// bare number is the page count, an image address is the cover, any other
+// address is a link, and what is left is the author.
 // Tabs work as separators too, so a spreadsheet column pastes straight in.
 // Blank lines and lines starting with # are ignored.
 function parseBulkInput(text) {
@@ -625,7 +628,7 @@ function parseBulkInput(text) {
         if (/^https?:\/\//i.test(trimmed)) {
             const derived = titleFromUrl(trimmed);
             if (!derived) { skipped.push(trimmed); return; }
-            entries.push({ title: derived, author: '', cover_url: '', link: trimmed });
+            entries.push({ title: derived, author: '', cover_url: '', link: trimmed, num_pages: null });
             return;
         }
 
@@ -636,9 +639,17 @@ function parseBulkInput(text) {
         const rest = parts.slice(1).map(p => p.trim()).filter(Boolean);
         const cover = rest.find(p => /^https?:\/\//i.test(p) && /\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(p)) || '';
         const link = rest.find(p => /^https?:\/\//i.test(p) && p !== cover) || '';
-        const author = rest.find(p => !/^https?:\/\//i.test(p)) || '';
+        const pagesField = rest.find(p => /^\d{1,5}$/.test(p)) || '';
+        const author = rest.find(p => !/^https?:\/\//i.test(p) && p !== pagesField) || '';
+        const pages = pagesField ? parseInt(pagesField, 10) : null;
 
-        entries.push({ title: title, author: author, cover_url: cover, link: link });
+        entries.push({
+            title: title,
+            author: author,
+            cover_url: cover,
+            link: link,
+            num_pages: pages && pages > 0 ? pages : null
+        });
     });
 
     return { entries: entries, skipped: skipped };
@@ -660,7 +671,8 @@ function addBooksBulk(entries) {
             title: title,
             author: String(entry.author || '').trim() || 'Unknown Author',
             cover_url: String(entry.cover_url || '').trim() || null,
-            num_pages: null,
+            num_pages: Number.isFinite(Number(entry.num_pages)) && Number(entry.num_pages) > 0
+                ? Number(entry.num_pages) : null,
             additional_authors: '',
             average_rating: '',
             publisher: '',

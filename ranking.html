@@ -235,9 +235,8 @@
             // Notes, editable in place. escapeHtml because this goes through
             // innerHTML along with the rest of the panel.
             parts.push(
-                '<label class="note-label" for="note_' + book.id + '">Your notes</label>' +
+                '<label class="note-label" for="note_' + book.id + '">Notes:</label>' +
                 '<textarea class="note-box" id="note_' + book.id + '" rows="3" ' +
-                'placeholder="Why do you want to read this?" ' +
                 'oninput="markNoteDirty(\'' + book.id + '\')" ' +
                 'onblur="saveNoteFrom(this, \'' + book.id + '\')">' +
                 escapeHtml(book.notes || '') + '</textarea>' +

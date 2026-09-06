@@ -93,95 +93,6 @@
 
     <section>
         <h2>FAQ</h2>
-        <section id="faq-my-books">
-            <h3>Adding Books by Hand and Writing Notes:</h3>
-            <p>
-                The <a href="books.html">My Books</a> page covers everything that does not come from a library export:
-            </p>
-            <ul>
-                <li><strong>Add a Book:</strong><br>
-                    Fill in a title, and optionally an author, an ISBN, a link and some notes. Give an ISBN and the
-                    cover is looked up for you. Otherwise paste a cover image URL, or upload an image from your device,
-                    which is scaled down before it is saved.
-                </li>
-                <li><strong>Add Many at Once:</strong><br>
-                    Paste a list with one book per line, as Title | Author | Cover image URL. Only the title is needed.
-                    Tabs work as separators too, so a column copied from a spreadsheet can be pasted straight in. Lines
-                    starting with # are ignored.
-                </li>
-                <li><strong>Notes:</strong><br>
-                    Every book has a notes box on the My Books page, and the same box sits inside the info panel on the
-                    Rank Books page, so you can write a note on a book while comparing it. Click the i on a cover to
-                    open it. Notes save when you click away from the box, and they are kept in your rankings CSV. A
-                    later library import will never overwrite a note you wrote.
-                </li>
-                <li><strong>Rereads:</strong><br>
-                    Your read shelf is imported alongside your want to read list, but kept out of matchups. On the My
-                    Books page you can search it and tick anything you would happily read again, which adds it to the
-                    ranking pool. Re-importing your library will not undo those ticks.
-                </li>
-                <li><strong>Archive or Delete:</strong><br>
-                    Archiving keeps a book and its ELO score but stops it appearing in matchups, and it can be restored
-                    at any time. Deleting removes it permanently.
-                </li>
-            </ul>
-        </section>
-
-        <section id="faq-royal-road">
-            <h3>Royal Road and Other Web Fiction:</h3>
-            <p>
-                Royal Road has no public API, and it does not let other websites read its pages from your browser, so
-                this site cannot fetch a want to read list from it automatically. You can still add web fiction quickly:
-            </p>
-            <ul>
-                <li><strong>Paste the Links:</strong><br>
-                    On the My Books page, paste Royal Road fiction links into the "Add Many at Once" box, one per line.
-                    Each becomes a book with its title taken from the web address, and the link is kept so you can click
-                    through to it later.
-                </li>
-                <li><strong>Add the Covers:</strong><br>
-                    To get a cover, right click the cover image on Royal Road, copy the image address, and put it as the
-                    third field on that book's line, after the title and the author.
-                </li>
-            </ul>
-        </section>
-
-        <section id="faq-missing-details">
-            <h3>Missing Page Counts and Book Details:</h3>
-            <p>
-                A Goodreads export carries the page count, publisher and year for every book. A StoryGraph export does
-                not, and books saved by very old versions of this site have none either, so their info panel is thin and
-                the page count is missing next to the author.
-            </p>
-            <ul>
-                <li><strong>They Are Filled In Automatically:</strong><br>
-                    Once covers have finished loading, the site looks up the missing page counts in the background, a
-                    book at a time, and the ranking page updates as they arrive. A large library takes a while, so
-                    leave the Rank Books page open and it will catch up.
-                </li>
-                <li><strong>Or Upload Your Goodreads Export Too:</strong><br>
-                    If a book is on both services, importing your Goodreads export fills in everything StoryGraph left
-                    out straight away. Importing one library never removes books from the other.
-                </li>
-            </ul>
-        </section>
-
-        <section id="faq-appearance">
-            <h3>Dark Mode and Small Screens:</h3>
-            <ul>
-                <li><strong>Dark Mode:</strong><br>
-                    The button at the end of the navigation bar switches between the light and dark themes, and your
-                    choice is remembered on that device. Until you pick one, the site follows whatever your operating
-                    system is set to.
-                </li>
-                <li><strong>Phones and Tablets:</strong><br>
-                    The layout adapts to the width of your screen. On a narrow screen the two books in a matchup stack
-                    one above the other, the win and skip buttons become the main way to choose, and the leaderboard
-                    table scrolls sideways on its own rather than stretching the page.
-                </li>
-            </ul>
-        </section>
-
         <section id="faq-storage-privacy">
             <h3>Data Storage and Privacy:</h3>
             <p>
@@ -220,6 +131,81 @@
                 </li>
             </ul>
         </section>
+
+        <section id="faq-my-books">
+            <h3>Adding Books by Hand and Writing Notes:</h3>
+            <p>
+                The <a href="books.html">My Books</a> page covers everything that does not come from a library export:
+            </p>
+            <ul>
+                <li><strong>Add a Book:</strong><br>
+                    Fill in a title, and optionally an author, an ISBN, a link and some notes. Give an ISBN and the
+                    cover is looked up for you. Otherwise paste a cover image URL, or upload an image from your device,
+                    which is scaled down before it is saved.
+                </li>
+                <li><strong>Add Multiple:</strong><br>
+                    Paste a list with one book per line, as Title | Author | Cover image URL | Pages. Only the title is
+                    needed, and the fields after it can be in any order: a plain number is read as the page count, an
+                    image address as the cover, any other address as a link. Tabs work as separators too, so a column
+                    copied from a spreadsheet can be pasted straight in. Lines starting with # are ignored.
+                </li>
+                <li><strong>Notes:</strong><br>
+                    Every book has a notes box on the My Books page, and the same box sits inside the info panel on the
+                    Rank Books page, so you can write a note on a book while comparing it. Click the i on a cover to
+                    open it. Notes save when you click away from the box, and they are kept in your rankings CSV. A
+                    later library import will never overwrite a note you wrote.
+                </li>
+                <li><strong>Rereads:</strong><br>
+                    Your read shelf is imported alongside your want to read list, but kept out of matchups. On the My
+                    Books page you can search it and tick anything you would happily read again, which adds it to the
+                    ranking pool. Re-importing your library will not undo those ticks.
+                </li>
+                <li><strong>Archive or Delete:</strong><br>
+                    Archiving keeps a book and its ELO score but stops it appearing in matchups, and it can be restored
+                    at any time. Deleting removes it permanently.
+                </li>
+            </ul>
+        </section>
+
+        <section id="faq-royal-road">
+            <h3>Royal Road and Other Web Fiction:</h3>
+            <p>
+                Royal Road has no public API, and it does not let other websites read its pages from your browser, so
+                this site cannot fetch a want to read list from it automatically. You can still add web fiction quickly:
+            </p>
+            <ul>
+                <li><strong>Paste the Links:</strong><br>
+                    On the My Books page, paste Royal Road fiction links into the "Add Multiple" box, one per line.
+                    Each becomes a book with its title taken from the web address, and the link is kept so you can click
+                    through to it later.
+                </li>
+                <li><strong>Add the Covers:</strong><br>
+                    To get a cover, right click the cover image on Royal Road, copy the image address, and put it as the
+                    third field on that book's line, after the title and the author.
+                </li>
+            </ul>
+        </section>
+
+        <section id="faq-missing-details">
+            <h3>Missing Page Counts and Book Details:</h3>
+            <p>
+                A Goodreads export carries the page count, publisher and year for every book. A StoryGraph export does
+                not, and books saved by very old versions of this site have none either, so their info panel is thin and
+                the page count is missing next to the author.
+            </p>
+            <ul>
+                <li><strong>They Are Filled In Automatically:</strong><br>
+                    Once covers have finished loading, the site looks up the missing page counts in the background, a
+                    book at a time, and the ranking page updates as they arrive. A large library takes a while, so
+                    leave the Rank Books page open and it will catch up.
+                </li>
+                <li><strong>Or Upload Your Goodreads Export Too:</strong><br>
+                    If a book is on both services, importing your Goodreads export fills in everything StoryGraph left
+                    out straight away. Importing one library never removes books from the other.
+                </li>
+            </ul>
+        </section>
+
     </section>
 </body>
 
